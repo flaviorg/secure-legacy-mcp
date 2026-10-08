@@ -1,27 +1,27 @@
-# ADR 0004: Limitador próprio, com balde por IP e por token
+# ADR 0004: Own rate limiter, with an IP bucket and a token bucket
 
-- **Status:** aceito (2026-10-04)
+- **Status:** accepted (2026-10-04)
 
-## Contexto
+## Context
 
-A aula 203489 limitou 90 requisições por minuto por token com `@fastify/rate-limit`, caindo para o IP quando não havia token. A aula 203490 apontou o contorno: quem tem vários tokens multiplica o limite. O plugin aceita uma chave por registro; o projeto quer dois limites ao mesmo tempo e testes determinísticos.
+Lesson 203489 limited requests to 90 per minute per token with `@fastify/rate-limit`, falling back to the IP when there was no token. Lesson 203490 pointed out the bypass: whoever has several tokens multiplies the limit. The plugin takes one key per registration; the project wants two limits at once and deterministic tests.
 
-## Decisão
+## Decision
 
-- Limitador de janela fixa próprio (`fixed-window-limiter.ts`, cerca de 50 linhas), em memória, com relógio injetável. A janela de cada chave começa no primeiro `hit`.
-- Dois baldes por requisição: **IP** (180 por 60 s) no primeiro `onRequest`, antes da autenticação, o que também freia força bruta de 401; **token** (90 por 60 s) depois da autenticação.
-- Cabeçalhos `x-ratelimit-limit`, `x-ratelimit-remaining` e `x-ratelimit-scope` (`ip` ou `token`) do balde que decidiu a resposta; 429 com `retry-after`.
-- `GET /v1/health` fica fora dos dois baldes (D-28): checagem de saúde não deve consumir limite, e o custo de abuso é baixo numa API em `127.0.0.1`.
-- O MCP traduz o 429 em `[RATE_LIMITED]` com o limite, os segundos de espera e o escopo no `_meta`.
+- A fixed-window limiter of its own (`fixed-window-limiter.ts`, about 50 lines), in memory, with an injectable clock. Each key's window starts at its first `hit`.
+- Two buckets per request: **IP** (180 per 60 s) in the first `onRequest`, before authentication, which also slows brute-force 401s; **token** (90 per 60 s) after authentication.
+- `x-ratelimit-limit`, `x-ratelimit-remaining` and `x-ratelimit-scope` (`ip` or `token`) headers from the bucket that decided the response; 429 with `retry-after`.
+- `GET /v1/health` stays outside both buckets (D-28): a health check should not consume the limit, and the cost of abuse is low on an API at `127.0.0.1`.
+- The MCP server translates the 429 into `[RATE_LIMITED]` with the limit, the wait in seconds and the scope in `_meta`.
 
-## Consequências
+## Consequences
 
-- Três tokens no mesmo IP são barrados na 181ª requisição (SEC-06).
-- Vários clientes locais (editor, Inspector, agente) dividem o balde de IP, porque todos saem de `127.0.0.1`. O `x-ratelimit-scope` mostra qual balde barrou; `docs/security.md` explica.
-- O limite zera quando a API reinicia, e não é compartilhado entre instâncias.
-- Janela fixa: uma rajada no fim de uma janela somada a outra no começo da seguinte deixa passar até 2 vezes o limite em poucos milissegundos. Aceito para uma API local; janela deslizante ou token bucket fechariam a brecha.
+- Three tokens on the same IP are stopped at the 181st request (SEC-06).
+- Several local clients (editor, Inspector, agent) share the IP bucket, because they all come from `127.0.0.1`. `x-ratelimit-scope` shows which bucket blocked; `docs/security.md` explains.
+- The limit resets when the API restarts, and is not shared between instances.
+- Fixed window: a burst at the end of one window plus another at the start of the next lets through up to twice the limit within a few milliseconds. Accepted for a local API; a sliding window or a token bucket would close the gap.
 
-## Alternativas
+## Alternatives
 
-- **`@fastify/rate-limit`:** maduro, mas uma chave por registro; dois registros com chaves diferentes no mesmo app e o relógio de teste exigiriam contornos. Revisitar se surgir necessidade de store distribuído (D-06).
-- **Só por token:** reabre o contorno por vários tokens e deixa a força bruta de token sem freio antes da autenticação.
+- **`@fastify/rate-limit`:** mature, but one key per registration; two registrations with different keys in the same app and the test clock would need workarounds. Revisit if a distributed store is ever needed (D-06).
+- **Per token only:** reopens the multiple-token bypass and leaves token brute force unchecked before authentication.

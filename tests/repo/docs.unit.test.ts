@@ -32,7 +32,7 @@ test('the README has the 16 sections of spec 10.1, in order', () => {
   assert.deepEqual(sections, README_SECTIONS);
 });
 
-test('ADRs 0001 to 0006 have Status, Contexto, Decisão, Consequências and Alternativas, in at most 40 lines', () => {
+test('ADRs 0001 to 0006 have Status, Context, Decision, Consequences and Alternatives, in at most 40 lines', () => {
   const adrs = files.filter((f) => /^docs\/adr\/\d{4}-[^/]+\.md$/.test(f));
   assert.deepEqual(adrs.map((f) => f.slice('docs/adr/'.length, 'docs/adr/'.length + 4)), ['0001', '0002', '0003', '0004', '0005', '0006']);
   for (const f of adrs) {
@@ -40,7 +40,7 @@ test('ADRs 0001 to 0006 have Status, Contexto, Decisão, Consequências and Alte
     assert.ok(text.split('\n').length <= 40, `${f} is longer than 40 lines`);
     assert.match(text, /^- \*\*Status:\*\* \S/m, f);
     const headings = [...text.matchAll(/^## (.+)$/gm)].map((m) => m[1]);
-    assert.deepEqual(headings, ['Contexto', 'Decisão', 'Consequências', 'Alternativas'], f);
+    assert.deepEqual(headings, ['Context', 'Decision', 'Consequences', 'Alternatives'], f);
   }
 });
 

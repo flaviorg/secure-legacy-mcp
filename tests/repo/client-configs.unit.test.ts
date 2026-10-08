@@ -25,7 +25,7 @@ test('the client snippets in docs/clients/README.md are valid JSON that start th
     const servers = JSON.parse(block).mcpServers as Record<string, { command: string; args: string[]; env: Record<string, string> }>;
     assert.deepEqual(Object.keys(servers), ['secure-legacy-mcp']);
     const server = servers['secure-legacy-mcp']!;
-    assert.deepEqual(server.env, { SERVICE_TOKEN: 'slm_<id>_<segredo>', LEGACY_API_URL: DEFAULT_API });
+    assert.deepEqual(server.env, { SERVICE_TOKEN: 'slm_<id>_<secret>', LEGACY_API_URL: DEFAULT_API });
     const fromClone = server.args.length === 1 && server.args[0]!.startsWith('/') && server.args[0]!.endsWith('/src/mcp/main.ts');
     const fromPackage = server.command === 'npx' && pkg.name in pkg.bin && JSON.stringify(server.args) === JSON.stringify(['-y', pkg.name]);
     assert.ok(fromClone || fromPackage, block);

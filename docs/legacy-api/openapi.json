@@ -155,7 +155,7 @@
   },
   "components": {
     "securitySchemes": {
-      "bearerAuth": { "type": "http", "scheme": "bearer", "description": "Service token slm_<id>_<segredo>, issued by the token CLI" }
+      "bearerAuth": { "type": "http", "scheme": "bearer", "description": "Service token slm_<id>_<secret>, issued by the token CLI" }
     },
     "schemas": {
       "LegacyCustomer": {

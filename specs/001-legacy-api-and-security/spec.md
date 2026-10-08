@@ -1,70 +1,70 @@
-# 001: API legada e camada de segurança
+# 001: Legacy API and security layer
 
-Status: implementado (marcos M1, M2 e M3). Design completo: `docs/legacy-api/README.md`, `docs/security.md` e ADRs 0003 e 0004.
+Status: implemented (milestones M1, M2 and M3). Full design: `docs/legacy-api/README.md`, `docs/security.md` and ADRs 0003 and 0004.
 
-## Contexto
+## Context
 
-Uma API REST de clientes simulada, hostil a agentes de propósito: campos crípticos (`cst_nm`, `dt_cad`), status `A`/`I`, segmento `1`/`2`/`3`, listagem sem limite e um `PUT` que devolve 500 cru se o corpo trouxer `cst_id`. Por cima dela, uma camada de segurança real: Service Tokens com hash SHA-256 e revogação em `node:sqlite`, CLI local para emitir, listar e revogar, RBAC `member`/`admin` com papel vindo só do banco, e rate limit com dois baldes (token e IP). É a autoridade que o servidor MCP (spec 002) consome.
+A simulated customer REST API, hostile to agents on purpose: cryptic fields (`cst_nm`, `dt_cad`), `A`/`I` status, `1`/`2`/`3` segment, an unbounded listing and a `PUT` that returns a raw 500 if the body carries `cst_id`. On top of it, a real security layer: Service Tokens with SHA-256 hashes and revocation in `node:sqlite`, a local CLI to issue, list and revoke, `member`/`admin` RBAC with the role coming only from the database, and rate limiting with two buckets (token and IP). It is the authority the MCP server (spec 002) consumes.
 
-## Critérios de aceite
+## Acceptance criteria
 
-**API legada**
+**Legacy API**
 
-- **API-01** Quando receber `GET /v1/customers` com qualquer combinação de `nm`, `eml`, `phn`, `sts`, `seg`, `dt_de` e `dt_ate`, a API deve aplicar todos os filtros na consulta SQL preparada e devolver em `qtd` o total filtrado antes de `lim` e `off`.
-- **API-02** Quando `nm` contiver `%` ou `_`, a API deve tratá-los como caracteres literais.
-- **API-03** Quando `nm` vier sem acento ou com outra caixa, a API deve encontrar os nomes acentuados correspondentes.
-- **API-04** Se o corpo de `PUT /v1/customers/:id` contiver `cst_id`, então a API deve responder 500 com a mensagem bruta do SQLite (armadilha legada documentada).
-- **API-05** Quando a API iniciar com a tabela `customers` vazia, ela deve inserir os 30 clientes do seed; quando já houver clientes, não deve inserir nada.
-- **API-06** Se um parâmetro conhecido tiver valor inválido, então a API deve responder 400 nomeando o parâmetro; parâmetros desconhecidos devem ser ignorados.
-- **API-07** Quando `GET /v1/customers` vier sem `lim`, a API deve devolver todos os clientes filtrados (comportamento legado preservado).
-- **API-08** Quando uma requisição autenticada chegar a uma rota que não existe, a API deve responder 404 com `{"msg":"nao encontrado"}`, sem ecoar a URL.
+- **API-01** When it receives `GET /v1/customers` with any combination of `nm`, `eml`, `phn`, `sts`, `seg`, `dt_de` and `dt_ate`, the API shall apply all the filters in the prepared SQL query and return in `qtd` the filtered total before `lim` and `off`.
+- **API-02** When `nm` contains `%` or `_`, the API shall treat them as literal characters.
+- **API-03** When `nm` comes without accents or in another case, the API shall find the matching accented names.
+- **API-04** If the body of `PUT /v1/customers/:id` contains `cst_id`, then the API shall answer 500 with the raw SQLite message (a documented legacy trap).
+- **API-05** When the API starts with the `customers` table empty, it shall insert the 30 seed customers; when there are already customers, it shall insert nothing.
+- **API-06** If a known parameter has an invalid value, then the API shall answer 400 naming the parameter; unknown parameters shall be ignored.
+- **API-07** When `GET /v1/customers` comes without `lim`, the API shall return all the filtered customers (legacy behavior preserved).
+- **API-08** When an authenticated request reaches a route that does not exist, the API shall answer 404 with `{"msg":"nao encontrado"}`, without echoing the URL.
 
-**Segurança**
+**Security**
 
-- **SEC-01** Quando a CLI emitir um token, o sistema deve gravar apenas o SHA-256 do token e exibi-lo em claro uma única vez.
-- **SEC-02** Quando uma rota fora da allowlist receber requisição sem Bearer, ou com token malformado, desconhecido, revogado ou expirado, a API deve responder 401 com o mesmo corpo genérico nos cinco casos.
-- **SEC-03** Quando um token `member` chamar `POST`, `PUT` ou `DELETE`, a API deve responder 403 com `papel_necessario: "admin"`.
-- **SEC-04** A API deve decidir o papel exclusivamente pelo registro do token no banco, ignorando qualquer papel enviado em cabeçalho ou corpo.
-- **SEC-05** Quando o mesmo token fizer a 91ª requisição dentro de 60 s, a API deve responder 429 com `retry-after`, `x-ratelimit-limit` e `x-ratelimit-remaining`.
-- **SEC-06** Quando um mesmo IP somar a 181ª requisição em 60 s, ainda que distribuída entre tokens diferentes, a API deve responder 429.
-- **SEC-07** Quando `revoke <id>` for executado, a próxima requisição com aquele token deve receber 401, sem reiniciar a API.
-- **SEC-08** A CLI e a API nunca devem exibir o hash nem, depois da emissão, o token, nem mesmo parte do segredo de um token colado com um caractere a menos ou a mais.
-- **SEC-09** Os logs da API não devem conter o valor do cabeçalho `Authorization`, nem um token enviado na query string.
-- **SEC-10** Enquanto a data atual for posterior a `expires_at`, a API deve tratar o token como inválido (401).
-- **SEC-11** Se `revoke` receber um id inexistente, então a CLI deve sair com código 2 e mensagem clara.
-- **SEC-12** A API deve enviar `x-ratelimit-limit`, `x-ratelimit-remaining` e `x-ratelimit-scope` do balde que decidiu a resposta, e `GET /v1/health` não deve consumir nenhum balde.
-- **SEC-13** Quando o cabeçalho `x-request-id` recebido não for um UUID, a API deve gerar um UUID novo como `requestId`; quando for, deve adotá-lo e devolvê-lo na resposta.
-- **SEC-14** Se uma rota ou um hook falhar com erro inesperado (fora da armadilha de API-04), então a API deve responder 500 com `{"erro":"erro interno"}`, sem mensagem, código ou stack internos, e registrar o detalhe só no log.
+- **SEC-01** When the CLI issues a token, the system shall store only the token's SHA-256 and show it in clear text exactly once.
+- **SEC-02** When a route outside the allowlist receives a request with no Bearer, or with a malformed, unknown, revoked or expired token, the API shall answer 401 with the same generic body in all five cases.
+- **SEC-03** When a `member` token calls `POST`, `PUT` or `DELETE`, the API shall answer 403 with `papel_necessario: "admin"`.
+- **SEC-04** The API shall decide the role exclusively from the token record in the database, ignoring any role sent in a header or body.
+- **SEC-05** When the same token makes the 91st request within 60 s, the API shall answer 429 with `retry-after`, `x-ratelimit-limit` and `x-ratelimit-remaining`.
+- **SEC-06** When the same IP adds up to the 181st request in 60 s, even if spread across different tokens, the API shall answer 429.
+- **SEC-07** When `revoke <id>` is executed, the next request with that token shall receive 401, without restarting the API.
+- **SEC-08** The CLI and the API shall never show the hash nor, after issue, the token, not even part of the secret of a pasted token with one character missing or extra.
+- **SEC-09** The API logs shall not contain the value of the `Authorization` header, nor a token sent in the query string.
+- **SEC-10** While the current date is later than `expires_at`, the API shall treat the token as invalid (401).
+- **SEC-11** If `revoke` receives an unknown id, then the CLI shall exit with code 2 and a clear message.
+- **SEC-12** The API shall send `x-ratelimit-limit`, `x-ratelimit-remaining` and `x-ratelimit-scope` of the bucket that decided the response, and `GET /v1/health` shall not consume any bucket.
+- **SEC-13** When the received `x-request-id` header is not a UUID, the API shall generate a new UUID as `requestId`; when it is, it shall adopt it and return it in the response.
+- **SEC-14** If a route or a hook fails with an unexpected error (outside the API-04 trap), then the API shall answer 500 with `{"erro":"erro interno"}`, with no internal message, code or stack, and log the detail only in the log.
 
 ## Non-goals
 
-| Fora do escopo | Motivo |
+| Out of scope | Reason |
 |---|---|
-| Login com usuário e senha, JWT e rota pública de emissão de token | O MCP só usa Service Token; a emissão fica na CLI local com acesso ao arquivo do banco. Menos superfície de ataque |
-| Rate limit distribuído (Redis), várias instâncias | Limitador em memória, zera no reinício; documentado em `docs/security.md` |
-| CORS e TLS na API | API em `127.0.0.1`, consumida por processo local |
-| Framework de migração de banco | Schema idempotente (`CREATE TABLE IF NOT EXISTS`) na inicialização |
-| Interface web, Docker | Não aumentam o impacto deste projeto |
+| Login with user and password, JWT and a public token-issue route | The MCP server only uses a Service Token; issuing stays in the local CLI with access to the database file. Less attack surface |
+| Distributed rate limit (Redis), several instances | In-memory limiter, resets on restart; documented in `docs/security.md` |
+| CORS and TLS on the API | API on `127.0.0.1`, consumed by a local process |
+| Database migration framework | Idempotent schema (`CREATE TABLE IF NOT EXISTS`) at startup |
+| Web interface, Docker | They do not increase the impact of this project |
 
-## Dúvidas resolvidas
+## Resolved questions
 
-Conferidas nos pacotes instalados (Node 24.21.0, `fastify` 5.12.5) durante a construção:
+Checked against the installed packages (Node 24.21.0, `fastify` 5.12.5) during construction:
 
-- `Fastify({ requestIdHeader: false, genReqId(req), bodyLimit: 16384, trustProxy: false })`: o `genReqId` recebe a requisição crua (`req.headers`); `app.inject({ remoteAddress })` muda `request.ip`; `app.hasRoute({ method, url })` existe.
-- O Fastify valida o corpo **antes** do `preHandler`. Com o RBAC em `preHandler`, um `member` mandando `{}` receberia 400 e aprenderia o schema. O `requireRole` roda em `preValidation`, que vem depois do parsing e antes da validação.
-- `decorateRequest('x', null)` serve para `caller` e `rateLimit`; `printRoutes({ commonPrefix: false })` lista um caminho por linha (usado pelo teste de contrato do OpenAPI); `logger: { level, stream, redact }` aceita `redact` em array; um `onSend` também recebe as respostas enviadas por hooks `onRequest` (401 e 429).
-- `node:sqlite`: `new DatabaseSync(path, { timeout: 5000 })`; `PRAGMA journal_mode=WAL` devolve `memory` em `:memory:` e `wal` em arquivo; erros têm `code: 'ERR_SQLITE_ERROR'` e `errcode` (2067 para UNIQUE; o erro de sintaxe da armadilha do `PUT` tem `errcode` 1, não o 2067 da tabela do plano).
-- Os schemas de corpo da API não usam `additionalProperties: false`: o `removeAdditional` do Ajv apagaria o `cst_id` e a armadilha do `PUT` (API-04) não dispararia.
-- O pino do Fastify escreve no stdout do processo da API. Nos testes e no demo, `startLegacyApi` usa `logger: false`, então o log da API nunca divide stdout com um servidor MCP stdio.
-- A expiração vale com `expires_at <= agora` (o milissegundo exato fica do lado inválido).
-- Num `setErrorHandler` da raiz, relançar o erro entrega-o ao handler padrão do Fastify: os 4xx do próprio Fastify (validação de corpo, JSON malformado, 413) mantêm o corpo padrão. Rotas desconhecidas passam pelos hooks `onRequest` antes do `setNotFoundHandler`, então um anônimo recebe 401. O handler padrão de 404 ecoa a URL (com a query string) no corpo.
-- O Fastify mescla os `serializers` recebidos sobre os seus, e o serializer `req` padrão loga `req.url` com a query string. O `buildApp` usa os mesmos campos do padrão (ou o serializer recebido) e mascara tokens na URL.
+- `Fastify({ requestIdHeader: false, genReqId(req), bodyLimit: 16384, trustProxy: false })`: `genReqId` receives the raw request (`req.headers`); `app.inject({ remoteAddress })` changes `request.ip`; `app.hasRoute({ method, url })` exists.
+- Fastify validates the body **before** `preHandler`. With RBAC in `preHandler`, a `member` sending `{}` would get 400 and learn the schema. `requireRole` runs in `preValidation`, which comes after parsing and before validation.
+- `decorateRequest('x', null)` works for `caller` and `rateLimit`; `printRoutes({ commonPrefix: false })` lists one path per line (used by the OpenAPI contract test); `logger: { level, stream, redact }` accepts `redact` as an array; an `onSend` also receives the responses sent by `onRequest` hooks (401 and 429).
+- `node:sqlite`: `new DatabaseSync(path, { timeout: 5000 })`; `PRAGMA journal_mode=WAL` returns `memory` on `:memory:` and `wal` on a file; errors have `code: 'ERR_SQLITE_ERROR'` and `errcode` (2067 for UNIQUE; the syntax error from the `PUT` trap has `errcode` 1, not the 2067 in the plan's table).
+- The API's body schemas do not use `additionalProperties: false`: Ajv's `removeAdditional` would delete `cst_id` and the `PUT` trap (API-04) would not fire.
+- Fastify's pino writes to the API process's stdout. In the tests and in the demo, `startLegacyApi` uses `logger: false`, so the API log never shares stdout with a stdio MCP server.
+- Expiry holds with `expires_at <= now` (the exact millisecond falls on the invalid side).
+- In a root `setErrorHandler`, rethrowing the error hands it to Fastify's default handler: Fastify's own 4xx (body validation, malformed JSON, 413) keep the default body. Unknown routes go through the `onRequest` hooks before `setNotFoundHandler`, so an anonymous caller gets 401. The default 404 handler echoes the URL (with the query string) in the body.
+- Fastify merges the `serializers` it receives over its own, and the default `req` serializer logs `req.url` with the query string. `buildApp` uses the same fields as the default (or the received serializer) and masks tokens in the URL.
 
 ## Checklist
 
-| Critério | Teste |
+| Criterion | Test |
 |---|---|
-| API-01 a API-08 | `tests/legacy-api/customers.int.test.ts` |
+| API-01 to API-08 | `tests/legacy-api/customers.int.test.ts` |
 | SEC-01, SEC-07, SEC-08 | `tests/legacy-api/token-store.unit.test.ts`, `tests/legacy-api/tokens-cli.e2e.test.ts` |
 | SEC-02, SEC-03, SEC-04, SEC-13, SEC-14 | `tests/legacy-api/auth-rbac.int.test.ts` |
 | SEC-05 | `tests/legacy-api/fixed-window-limiter.unit.test.ts`, `tests/legacy-api/rate-limit.int.test.ts` |

@@ -1,27 +1,27 @@
-# ADR 0005: Erros de tool sem `structuredContent`
+# ADR 0005: Tool errors without `structuredContent`
 
-- **Status:** aceito (2026-10-04)
+- **Status:** accepted (2026-10-04)
 
-## Contexto
+## Context
 
-Na aula 203490 os erros das tools voltavam dentro de `structuredContent`. No SDK 1.32 isso quebra: o `Client` valida `structuredContent` contra o `outputSchema` sempre que ele vem, inclusive com `isError: true`, e um objeto de erro não casa com o schema de sucesso. Além disso, uma exceção lançada no handler vira `isError` com a mensagem crua (por exemplo, `SQLITE_ERROR: ...`), conferido nos tipos e em execução (spec, Apêndice A).
+In lesson 203490 the tool errors came back inside `structuredContent`. In SDK 1.32 that breaks: the `Client` validates `structuredContent` against the `outputSchema` whenever it is present, even with `isError: true`, and an error object does not match the success schema. Also, an exception thrown in the handler becomes `isError` with the raw message (for example `SQLITE_ERROR: ...`), checked in the types and at runtime (spec, Appendix A).
 
-## Decisão
+## Decision
 
-- Todo handler roda dentro de `defineTool`, que captura tudo; nada é lançado para o SDK.
-- Erro é `{ isError: true, content: [{ type: 'text', text: '[CODIGO] mensagem' }], _meta: { 'secure-legacy-mcp/error': { code, retryable, requestId, retryAfterSeconds?, scope? } } }`, sem `structuredContent` (D-07).
-- O texto vem de um catálogo fechado de 11 códigos (`src/mcp/domain/errors.ts`), em inglês, sem stack, SQL, URL ou token. O detalhe (corpo cru da API mascarado e truncado em 500 caracteres, stack de exceção) vai só para o stderr, com o mesmo `requestId`.
-- `retryable` é verdadeiro só para `RATE_LIMITED` e `UPSTREAM_UNAVAILABLE`.
-- Uma escrita aceita pela API cuja releitura falha vira `[READBACK_FAILED]` com o id do cliente e `retryable: false` (MCP-17). Sem esse código, uma falha de rede ou um 429 na releitura viraria `UPSTREAM_UNAVAILABLE` ou `RATE_LIMITED`, que convidam a repetir; repetir `createCustomer` daria `[CONFLICT]` ("outro cliente já usa este e-mail"), uma mensagem enganosa, porque o cliente é o mesmo.
+- Every handler runs inside `defineTool`, which catches everything; nothing is thrown to the SDK.
+- An error is `{ isError: true, content: [{ type: 'text', text: '[CODE] message' }], _meta: { 'secure-legacy-mcp/error': { code, retryable, requestId, retryAfterSeconds?, scope? } } }`, with no `structuredContent` (D-07).
+- The text comes from a closed catalog of 11 codes (`src/mcp/domain/errors.ts`), in English, with no stack, SQL, URL or token. The detail (the API's raw body, masked and truncated to 500 characters, the exception stack) goes only to stderr, with the same `requestId`.
+- `retryable` is true only for `RATE_LIMITED` and `UPSTREAM_UNAVAILABLE`.
+- A write accepted by the API whose read-back fails becomes `[READBACK_FAILED]` with the customer id and `retryable: false` (MCP-17). Without this code, a network failure or a 429 on the read-back would become `UPSTREAM_UNAVAILABLE` or `RATE_LIMITED`, which invite a retry; retrying `createCustomer` would give `[CONFLICT]` ("another customer already uses this email"), a misleading message, because the customer is the same one.
 
-## Consequências
+## Consequences
 
-- O modelo lê um prefixo estável (`[FORBIDDEN]`, `[CONFLICT]`) e uma frase acionável; o cliente pode decidir repetição pelo `_meta`. O `@langchain/mcp-adapters` entrega esse texto ao agente como `ToolMessage` com `status: 'error'`.
-- Os textos do catálogo são testados por igualdade exata (MCP-08), e os testes procuram `SQLITE`, `Error:`, stack e o token em todo texto de erro.
-- Clientes que só olham `structuredContent` não veem o erro estruturado; precisam ler `content` ou `_meta`.
+- The model reads a stable prefix (`[FORBIDDEN]`, `[CONFLICT]`) and an actionable sentence; the client can decide on retries from `_meta`. `@langchain/mcp-adapters` hands this text to the agent as a `ToolMessage` with `status: 'error'`.
+- The catalog texts are tested by exact equality (MCP-08), and the tests look for `SQLITE`, `Error:`, stacks and the token in every error text.
+- Clients that only look at `structuredContent` do not see the structured error; they have to read `content` or `_meta`.
 
-## Alternativas
+## Alternatives
 
-- **Erro dentro de `structuredContent` (aula):** rejeitado pelo próprio cliente do SDK 1.32.
-- **`outputSchema` como união de sucesso e erro:** polui o schema de todas as tools e o custo em tokens das definições, e o modelo teria de discriminar a união.
-- **Lançar exceção e deixar o SDK formatar:** vaza a mensagem crua.
+- **Error inside `structuredContent` (the lesson):** rejected by the SDK 1.32 client itself.
+- **`outputSchema` as a union of success and error:** pollutes every tool's schema and the token cost of the definitions, and the model would have to discriminate the union.
+- **Throw and let the SDK format it:** leaks the raw message.

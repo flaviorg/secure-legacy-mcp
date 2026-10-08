@@ -8,7 +8,7 @@ const token = 'slm_k3x9q2ab_' + 'A'.repeat(43);
 test('[MCP-03] tokenIdOf extracts the public id only from well-formed tokens', () => {
   assert.equal(tokenIdOf(token), 'k3x9q2ab');
   assert.equal(tokenIdOf(token + 'x'), null);
-  assert.equal(tokenIdOf('slm_<id>_<segredo>'), null);
+  assert.equal(tokenIdOf('slm_<id>_<secret>'), null);
 });
 
 test('[MCP-03] redact masks sensitive field names at any depth', () => {
@@ -26,7 +26,7 @@ test('[SEC-09] a truncated or padded token is masked as well, never partially ec
   for (const pasted of [token.slice(0, 55), token.slice(0, 14), token + 'x', token + '-extra']) {
     assert.equal(maskTokens(`Token ${pasted} end`), 'Token slm_k3x9q2ab_*** end', pasted);
   }
-  assert.equal(maskTokens('slm_<id>_<segredo>'), 'slm_<id>_<segredo>'); // placeholders in docs stay readable
+  assert.equal(maskTokens('slm_<id>_<secret>'), 'slm_<id>_<secret>'); // placeholders in docs stay readable
   assert.equal(maskTokens('slm_k3x9q2ab_***'), 'slm_k3x9q2ab_***');     // already masked
 });
 

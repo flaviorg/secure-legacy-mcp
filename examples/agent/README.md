@@ -1,50 +1,50 @@
-# Agente LangChain (extra opcional)
+# LangChain agent (optional extra)
 
-Um agente LangChain.js que consome o servidor MCP deste repositório pelo `@langchain/mcp-adapters`, com memória de dois turnos. Ele corrige o "qual é o id dele?" da aula 203493 (agente sem memória) e prova isso com teste, antes e depois.
+A LangChain.js agent that consumes this repository's MCP server through `@langchain/mcp-adapters`, with two-turn memory. It fixes the "what is his id?" of lesson 203493 (an agent without memory) and proves it with a test, before and after.
 
 ```bash
 npm run agent:demo
 ```
 
-Sem chave e sem `.env`, o demo usa o modelo fake roteirizado. Para cada execução (memória ligada e desligada) ele sobe a API legada em processo, emite um token `admin`, inicia o servidor MCP como processo filho via stdio e roda o roteiro `create-then-ask-id`.
+Without a key and without a `.env`, the demo uses the scripted fake model. For each run (memory on and off) it starts the legacy API in process, issues an `admin` token, starts the MCP server as a child process over stdio and runs the `create-then-ask-id` script.
 
-## Peças
+## Pieces
 
-| Arquivo | Papel |
+| File | Role |
 |---|---|
-| `config.ts` | `loadAgentConfig(env)`: `fake` por padrão; `openrouter` quando há `OPENROUTER_API_KEY` e `LLM_PROVIDER` não foi definido; `openrouter` sem chave falha cedo. Único arquivo de `examples/` que lê `process.env` |
-| `agent.ts` | `connectCustomersMcp` (servidor `customers` via stdio, `env` explícito, nomes de tool sem prefixo), `createCustomerAgent` (`createAgent` + `MemorySaver` opcional + tetos por turno) e `ask` (um turno; se ele falha, a thread volta ao estado de antes dele) |
-| `model.ts` | `createChatModel`: fake, ou `ChatOpenAI` apontando para `https://openrouter.ai/api/v1` |
-| `prompts/v1/system.ts` | Prompt de sistema versionado: dados só por tools, nunca adivinhar id, resolver antes de escrever, parar diante de `ambiguous`, repassar `[CODIGO]`, responder em inglês |
-| `fake/scripted-router.ts` | Função pura `(fixture, mensagens) -> AIMessage`: escolhe o passo pela última mensagem do usuário e resolve `{{tool:X.caminho}}`, `{{history:X.caminho}}` e `{{error:X}}` nos resultados reais das tools |
-| `fake/scripted-chat-model.ts` | `BaseChatModel` fino sobre o router |
-| `fixtures/*.json` | Um roteiro por cenário: `create-then-ask-id`, `deactivate-teodoro`, `ambiguous-maria`, `member-forbidden` |
+| `config.ts` | `loadAgentConfig(env)`: `fake` by default; `openrouter` when there is an `OPENROUTER_API_KEY` and `LLM_PROVIDER` was not set; `openrouter` without a key fails early. The only file in `examples/` that reads `process.env` |
+| `agent.ts` | `connectCustomersMcp` (`customers` server over stdio, explicit `env`, tool names without a prefix), `createCustomerAgent` (`createAgent` + optional `MemorySaver` + per-turn ceilings) and `ask` (one turn; if it fails, the thread goes back to the state before it) |
+| `model.ts` | `createChatModel`: the fake, or `ChatOpenAI` pointing at `https://openrouter.ai/api/v1` |
+| `prompts/v1/system.ts` | Versioned system prompt: data only through tools, never guess an id, resolve before writing, stop on `ambiguous`, relay `[CODE]`, answer in English |
+| `fake/scripted-router.ts` | Pure function `(fixture, messages) -> AIMessage`: picks the step from the last user message and resolves `{{tool:X.path}}`, `{{history:X.path}}` and `{{error:X}}` against the real tool results |
+| `fake/scripted-chat-model.ts` | A thin `BaseChatModel` over the router |
+| `fixtures/*.json` | One script per scenario: `create-then-ask-id`, `deactivate-teodoro`, `ambiguous-maria`, `member-forbidden` |
 
-Tetos por turno (spec 6.1): 6 chamadas de modelo e 4 chamadas de tool, os dois com `exitBehavior: 'error'`. O teste `runaway-loop` mostra o turno parando com `ToolCallLimitExceededError` na 5ª chamada de tool; com o teto de tools afrouxado no teste, o de modelo para o turno na 7ª chamada (`ModelCallLimitMiddlewareError`). Dois detalhes do LangGraph que o código trata:
+Per-turn ceilings (spec 6.1): 6 model calls and 4 tool calls, both with `exitBehavior: 'error'`. The `runaway-loop` test shows the turn stopping with `ToolCallLimitExceededError` on the 5th tool call; with the tool ceiling loosened in the test, the model ceiling stops the turn on the 7th call (`ModelCallLimitMiddlewareError`). Two LangGraph details the code handles:
 
-- **Limite de passos do grafo.** O LangGraph para um run em 25 passos por padrão, e aqui cada chamada de modelo que pede uma tool gasta 5 passos. Sem ajuste, um turno legítimo com 4 tools em sequência morria com `GraphRecursionError` antes da resposta final. `createCustomerAgent` sobe esse limite acima dos tetos, para que sejam eles que param o turno.
-- **Turno que falha não fica na memória.** O middleware só zera os contadores do turno quando ele termina bem. Sem tratamento, depois de um erro de teto a thread guardava os contadores no limite (o turno seguinte falhava na primeira tool) e uma `AIMessage` com chamada de tool sem resposta, que APIs de modelo real recusam. `ask` devolve a thread ao checkpoint anterior ao turno antes de repassar o erro.
+- **Graph step limit.** LangGraph stops a run at 25 steps by default, and here each model call that asks for a tool spends 5 steps. Without an adjustment, a legitimate turn with 4 tools in sequence died with `GraphRecursionError` before the final answer. `createCustomerAgent` raises that limit above the ceilings, so that the ceilings are what stop the turn.
+- **A failed turn does not stay in memory.** The middleware only resets the turn counters when the turn ends well. Without handling, after a ceiling error the thread kept the counters at the limit (the next turn failed on its first tool) and an `AIMessage` with a tool call that had no response, which real model APIs reject. `ask` returns the thread to the checkpoint before the turn before re-raising the error.
 
-## O que o fake prova, e o que não prova
+## What the fake proves, and what it does not
 
-O fake **ignora o prompt de sistema** e segue o roteiro da fixture. Ele não decide nada: prova a mecânica (o agente chama as tools reais, o resultado real volta como `ToolMessage`, o histórico chega ao modelo no turno seguinte só com memória, os tetos interrompem um laço, um `[FORBIDDEN]` chega até a resposta). Os valores da resposta (id, nome) vêm do servidor MCP real contra a API real; o fake não inventa dados. Entrada sem roteiro lança `FakeScriptMissError` com a chave normalizada e as chaves conhecidas.
+The fake **ignores the system prompt** and follows the fixture's script. It decides nothing: it proves the mechanics (the agent calls the real tools, the real result comes back as a `ToolMessage`, the history reaches the model on the next turn only with memory, the ceilings interrupt a loop, a `[FORBIDDEN]` reaches the answer). The values in the answer (id, name) come from the real MCP server against the real API; the fake does not invent data. Input with no script throws `FakeScriptMissError` with the normalized key and the known keys.
 
-Se o modelo obedece ao prompt (parar diante de homônimos, não adivinhar id) só aparece com modelo real.
+Whether the model obeys the prompt (stopping on namesakes, not guessing an id) only shows up with a real model.
 
-## Modelo real (OpenRouter)
+## Real model (OpenRouter)
 
 ```bash
-cp .env.example .env    # preencha OPENROUTER_API_KEY; OPENROUTER_MODEL é opcional (padrão openrouter/free)
+cp .env.example .env    # fill in OPENROUTER_API_KEY; OPENROUTER_MODEL is optional (default openrouter/free)
 npm run agent:demo
-npm run test:live       # create-then-ask-id e deactivate-teodoro; assevera o banco e o id, nunca o texto
+npm run test:live       # create-then-ask-id and deactivate-teodoro; asserts the database and the id, never the text
 ```
 
-Sem `OPENROUTER_API_KEY`, `npm run test:live` pula os dois testes (`OPENROUTER_API_KEY ausente`) e sai com 0. Se o modelo gratuito padrão não suportar tools, escolha outro modelo gratuito com suporte a tools em `OPENROUTER_MODEL`.
+Without `OPENROUTER_API_KEY`, `npm run test:live` skips both tests (`OPENROUTER_API_KEY is not set`) and exits with 0. If the default free model does not support tools, pick another free model with tool support in `OPENROUTER_MODEL`.
 
-## Testes
+## Tests
 
 - `tests/agent/scripted-router.unit.test.ts`: placeholders, `ifUnresolved`, `FakeScriptMissError`, fixtures, config.
-- `tests/agent/model-and-prompt.unit.test.ts`: `createChatModel` (cliente do OpenRouter montado sem rede, fake com fixture) e as regras do prompt de sistema.
-- `tests/agent/agent-memory.e2e.test.ts`: os cenários contra o servidor MCP e a API reais (memória ligada e desligada, teto de tools, homônimos, papel `member`).
-- `tests/agent/agent-ceilings.e2e.test.ts`: as bordas dos tetos (4 tools em sequência, teto de modelo, turno que falha fora da memória) e o prompt de sistema em toda chamada de modelo.
-- `tests/agent/agent-demo.e2e.test.ts`: o `agent:demo` com o fake.
+- `tests/agent/model-and-prompt.unit.test.ts`: `createChatModel` (OpenRouter client built without the network, fake with a fixture) and the system prompt rules.
+- `tests/agent/agent-memory.e2e.test.ts`: the scenarios against the real MCP server and API (memory on and off, tool ceiling, namesakes, `member` role).
+- `tests/agent/agent-ceilings.e2e.test.ts`: the ceiling edges (4 tools in sequence, model ceiling, a failed turn kept out of memory) and the system prompt on every model call.
+- `tests/agent/agent-demo.e2e.test.ts`: `agent:demo` with the fake.

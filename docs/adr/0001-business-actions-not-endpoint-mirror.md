@@ -1,33 +1,33 @@
-# ADR 0001: Ações de negócio, não espelho de endpoints
+# ADR 0001: Business actions, not an endpoint mirror
 
-- **Status:** aceito (2026-10-04)
+- **Status:** accepted (2026-10-04)
 
-## Contexto
+## Context
 
-A API legada tem 7 rotas com campos crípticos (`cst_nm`, `dt_cad`), códigos (`A`/`I`, `1`/`2`/`3`), listagem sem limite e um `PUT` que exige o objeto completo e quebra com `cst_id` no corpo. Converter cada rota numa tool (como fazem os conversores REST para MCP citados na aula 203483) entrega ao modelo todas essas armadilhas. Colar a spec OpenAPI inteira no prompt (a alternativa sem MCP discutida em 203470) custa ainda mais contexto.
+The legacy API has 7 routes with cryptic fields (`cst_nm`, `dt_cad`), codes (`A`/`I`, `1`/`2`/`3`), an unbounded listing, and a `PUT` that requires the full object and breaks when the body has `cst_id`. Turning each route into a tool (as the REST-to-MCP converters cited in lesson 203483 do) hands the model all of these traps. Pasting the whole OpenAPI spec into the prompt (the non-MCP alternative discussed in 203470) costs even more context.
 
-## Decisão
+## Decision
 
-O servidor expõe 5 ações de negócio: `getCustomer` (resolve por qualquer critério, com `found`/`ambiguous`/`none`), `searchCustomers` (filtros no banco e cursor), `createCustomer`, `updateCustomerContact` e `deactivateCustomer`. O de-para fica na `infrastructure` e a regra no service. Regras de camada (spec 4.3, testadas no `conventions.unit`): `src/mcp` não importa `src/legacy-api`; `tools`, `resources` e `prompts` só chamam o service; o service só conhece a porta `CustomerGateway`; só a `infrastructure` faz HTTP; `src/shared` não importa os outros dois.
+The server exposes 5 business actions: `getCustomer` (resolves by any criterion, with `found`/`ambiguous`/`none`), `searchCustomers` (database-side filters and a cursor), `createCustomer`, `updateCustomerContact` and `deactivateCustomer`. The legacy mapping lives in `infrastructure` and the rules in the service. Layer rules (spec 4.3, tested in `conventions.unit`): `src/mcp` does not import `src/legacy-api`; `tools`, `resources` and `prompts` only call the service; the service only knows the `CustomerGateway` port; only `infrastructure` does HTTP; `src/shared` imports neither of the other two.
 
-O JSON Schema das entradas usa helpers de campo com `pattern` curto (`emailField`, `isoDateField`, D-25), porque o SDK 1.32 converte o Zod sem `override` e o padrão do Zod 4 emite `pattern` longos. A validação forte continua no servidor (`format: email`, `refine` de data de calendário).
+The input JSON Schema uses field helpers with a short `pattern` (`emailField`, `isoDateField`, D-25), because SDK 1.32 converts Zod without `override` and the Zod 4 default emits long `pattern`s. Strong validation stays on the server (`format: email`, a calendar-date `refine`).
 
-## Consequências
+## Consequences
 
-Números de `npm run bench:tokens` (tokenizador `o200k_base`; tabela completa no README e em `docs/token-comparison.md`):
+Numbers from `npm run bench:tokens` (`o200k_base` tokenizer; full table in the README and in `docs/token-comparison.md`):
 
-| Medida | Espelho REST (7 tools) | Ações de negócio (5 tools) |
+| Measure | REST mirror (7 tools) | Business actions (5 tools) |
 |---|---:|---:|
-| Definições (`name`, `description`, `inputSchema`) | 859 | 956 |
-| C2a, enterprise ativos de 2024: tokens de resultado | 188 | 102 |
-| C3, desativar o Teodoro: tokens de argumentos | 58 | 11 |
-| C3: tokens de resultado | 82 | 119 |
+| Definitions (`name`, `description`, `inputSchema`) | 859 | 956 |
+| C2a, active enterprise customers of 2024: result tokens | 188 | 102 |
+| C3, deactivate Teodoro: argument tokens | 58 | 11 |
+| C3: result tokens | 82 | 119 |
 
-- As definições das ações de negócio custam 11% mais que as do espelho, e o `tools/list` completo (com `outputSchema` e `annotations`) chega a 2471 tokens. A spec OpenAPI inteira custa 2313. O ganho está nas chamadas: o modelo não monta o objeto completo do `PUT`, não decodifica códigos e recebe listas menores; no C3 as ações devolvem o cliente inteiro, e o resultado é maior que o `{id, msg}` do legado.
-- Custo de schema (D-25), medido uma vez trocando os helpers por `z.email()` e `z.iso.date()` sem salvar a troca: as definições das ações de negócio iriam de 956 para 1327 tokens (+371, +39%) e o `tools/list` completo de 2471 para 2842 (os esquemas de saída não usam os helpers: nome, e-mail e data saem como o legado guarda, ver MCP-15). Sem `describe`, `z.email()` emite 154 caracteres de schema contra 77 do helper, e `z.iso.date()` 259 contra 52 (spec, Apêndice B).
-- Qualquer mudança em `description`, `describe` ou schema de tool exige `npm run bench:tokens` (o `npm test` compara a tabela, BEN-02).
+- The business action definitions cost 11% more than the mirror's, and the full `tools/list` (with `outputSchema` and `annotations`) reaches 2471 tokens. The whole OpenAPI spec costs 2312. The gain is in the calls: the model does not build the full `PUT` object, does not decode codes, and receives smaller lists; in C3 the actions return the whole customer, so the result is larger than the legacy `{id, msg}`.
+- Schema cost (D-25), measured once by swapping the helpers for `z.email()` and `z.iso.date()` without saving the swap: the business action definitions would go from 956 to 1327 tokens (+371, +39%) and the full `tools/list` from 2471 to 2842 (the output schemas do not use the helpers: name, email and date come out as the legacy stores them, see MCP-15). Without `describe`, `z.email()` emits 154 characters of schema against the helper's 77, and `z.iso.date()` 259 against 52 (spec, Appendix B).
+- Any change to a tool's `description`, `describe` or schema requires `npm run bench:tokens` (`npm test` compares the table, BEN-02).
 
-## Alternativas
+## Alternatives
 
-- **Espelho 1:1 gerado do OpenAPI:** menos código no servidor, mas o modelo herda as armadilhas e o custo de erro (que a tabela não mede, salvo a linha C2b). Mantido só como baseline do comparativo, gerado por função pura para não ser piorado de propósito.
-- **Spec OpenAPI inteira no prompt:** sem servidor, 2313 tokens fixos por conversa e nenhuma proteção contra `PUT` parcial ou listagem sem limite.
+- **1:1 mirror generated from OpenAPI:** less server code, but the model inherits the traps and the cost of mistakes (which the table does not measure, except the C2b row). Kept only as the comparison baseline, generated by a pure function so it is not made worse on purpose.
+- **Whole OpenAPI spec in the prompt:** no server, a fixed 2312 tokens per conversation, and no protection against a partial `PUT` or an unbounded listing.

@@ -1,50 +1,50 @@
-# API legada simulada
+# Simulated legacy API
 
-> **English summary:** a deliberately awkward legacy REST API (Fastify 5 + `node:sqlite`) with a real security layer: hashed service tokens, member/admin RBAC and two rate-limit buckets (per IP and per token). The MCP server in `src/mcp` is an HTTP client of this API. Contract: [`openapi.json`](./openapi.json), checked against the registered routes by `tests/legacy-api/openapi-contract.int.test.ts`.
+> **Summary:** a deliberately awkward legacy REST API (Fastify 5 + `node:sqlite`) with a real security layer: hashed service tokens, member/admin RBAC and two rate-limit buckets (per IP and per token). The MCP server in `src/mcp` is an HTTP client of this API. Contract: [`openapi.json`](./openapi.json), checked against the registered routes by `tests/legacy-api/openapi-contract.int.test.ts`.
 
-A API imita um sistema antigo de cadastro de clientes: nomes de campo crípticos (`cst_nm`, `dt_cad`), códigos (`A`/`I`, `1`/`2`/`3`), mensagens sem acento e algumas armadilhas de propósito. Ela é a autoridade de autenticação, papel e limite; o servidor MCP nunca acessa o banco.
+The API imitates an old customer registry system: cryptic field names (`cst_nm`, `dt_cad`), codes (`A`/`I`, `1`/`2`/`3`), messages without accents and some deliberate traps. It is the authority for authentication, role and rate limit; the MCP server never accesses the database.
 
-## Como subir
+## How to start it
 
 ```bash
 npm run api
 ```
 
-Sobe em `http://127.0.0.1:9999` com o banco em `./data/legacy.db` (criado com 30 clientes fictícios na primeira vez). O `npm run api` lê um `.env` na raiz, se existir.
+It starts at `http://127.0.0.1:9999` with the database at `./data/legacy.db` (created with 30 fictional customers the first time). `npm run api` reads a `.env` at the root, if there is one.
 
-| Variável | Padrão | Validação |
+| Variable | Default | Validation |
 |---|---|---|
-| `PORT` | `9999` | inteiro de 1 a 65535 |
-| `HOST` | `127.0.0.1` | texto |
-| `DATABASE_PATH` | `./data/legacy.db` | caminho; `:memory:` para um banco descartável |
-| `RATE_LIMIT_PER_TOKEN` | `90` | inteiro >= 1 |
-| `RATE_LIMIT_PER_IP` | `180` | inteiro >= 1 |
-| `RATE_LIMIT_WINDOW_MS` | `60000` | inteiro >= 1000 |
-| `LOG_LEVEL` | `info` | `debug`, `info`, `warn` ou `error` |
+| `PORT` | `9999` | integer from 1 to 65535 |
+| `HOST` | `127.0.0.1` | text |
+| `DATABASE_PATH` | `./data/legacy.db` | path; `:memory:` for a throwaway database |
+| `RATE_LIMIT_PER_TOKEN` | `90` | integer >= 1 |
+| `RATE_LIMIT_PER_IP` | `180` | integer >= 1 |
+| `RATE_LIMIT_WINDOW_MS` | `60000` | integer >= 1000 |
+| `LOG_LEVEL` | `info` | `debug`, `info`, `warn` or `error` |
 
-Com valor inválido a API não sobe: sai com código 1 e escreve em stderr só o nome da variável e o motivo, nunca o valor.
+With an invalid value the API does not start: it exits with code 1 and writes to stderr only the variable name and the reason, never the value.
 
-## Como emitir um token
+## How to issue a token
 
-Os tokens são emitidos pela CLI, direto no arquivo do banco (a API pode estar rodando):
+Tokens are issued by the CLI, straight on the database file (the API can be running):
 
 ```bash
-npm run tokens -- issue --name meu-cliente --role member --expires-in 30d
+npm run tokens -- issue --name my-client --role member --expires-in 30d
 npm run tokens -- list
 npm run tokens -- revoke <id>
 ```
 
-- `issue` mostra o token completo **uma única vez**; o banco guarda só o SHA-256 dele. Papéis: `member` (só leitura) e `admin` (leitura e escrita). Sem `--expires-in` (`<n>d` ou `<n>h`), o token não expira.
-- `list` mostra id, nome, papel, datas e status (`ativo`, `revogado`, `expirado`); `--json` devolve a mesma lista em JSON. Nunca mostra hash nem token.
-- `revoke` vale na requisição seguinte, sem reiniciar a API (a verificação consulta o banco a cada pedido). Revogar de novo devolve 0; id inexistente devolve 2.
-- `--db <caminho>` escolhe o banco; sem ele, vale `DATABASE_PATH` e depois `./data/legacy.db`.
+- `issue` shows the full token **exactly once**; the database keeps only its SHA-256. Roles: `member` (read-only) and `admin` (read and write). Without `--expires-in` (`<n>d` or `<n>h`), the token does not expire.
+- `list` shows id, name, role, dates and status (`active`, `revoked`, `expired`); `--json` returns the same list as JSON. It never shows a hash or a token.
+- `revoke` takes effect on the next request, with no API restart (the check queries the database on every request). Revoking again returns 0; an unknown id returns 2.
+- `--db <path>` picks the database; without it, `DATABASE_PATH` applies, then `./data/legacy.db`.
 
-O formato é `slm_<id>_<segredo>`: `<id>` tem 8 caracteres públicos e `<segredo>` tem 43 caracteres base64url (256 bits aleatórios). O prefixo facilita a varredura de segredos.
+The format is `slm_<id>_<secret>`: `<id>` is 8 public characters and `<secret>` is 43 base64url characters (256 random bits). The prefix makes secret scanning easier.
 
-## Exemplos com `curl`
+## `curl` examples
 
 ```bash
-export SLM_TOKEN='slm_<id>_<segredo>'   # o valor impresso pelo issue
+export SLM_TOKEN='slm_<id>_<secret>'   # the value printed by issue
 
 curl -s http://127.0.0.1:9999/v1/health
 curl -s http://127.0.0.1:9999/v1/auth/whoami -H "Authorization: Bearer $SLM_TOKEN"
@@ -52,55 +52,57 @@ curl -s 'http://127.0.0.1:9999/v1/customers?nm=teodoro&lim=6' -H "Authorization:
 curl -s 'http://127.0.0.1:9999/v1/customers?sts=A&seg=3&dt_de=20240101&dt_ate=20241231&lim=10' -H "Authorization: Bearer $SLM_TOKEN"
 curl -s http://127.0.0.1:9999/v1/customers/12 -H "Authorization: Bearer $SLM_TOKEN"
 
-# escrita: exige token admin
+# write: requires an admin token
 curl -s -X POST http://127.0.0.1:9999/v1/customers -H "Authorization: Bearer $SLM_TOKEN" \
   -H 'content-type: application/json' \
-  -d '{"cst_nm":"Cliente Novo","cst_phn":"11900000099","cst_eml":"cliente.novo@example.com","cst_seg":2}'
+  -d '{"cst_nm":"New Customer","cst_phn":"11900000099","cst_eml":"new.customer@example.com","cst_seg":2}'
 ```
 
-Use `curl -i` para ver os cabeçalhos `x-request-id` e `x-ratelimit-*`.
+Use `curl -i` to see the `x-request-id` and `x-ratelimit-*` headers.
 
-## Rotas
+## Routes
 
-| Método e rota | Papel | Respostas |
+| Method and route | Role | Responses |
 |---|---|---|
-| `GET /v1/health` | pública | 200 `{"status":"UP"}` |
-| `GET /v1/auth/whoami` | qualquer | 200 `{"tokenId","name","role"}` |
-| `GET /v1/customers` | qualquer | 200 `{"qtd": <total filtrado>, "dados": [...]}`; 400 `{"erro":"parametro invalido: <nome>"}` |
-| `GET /v1/customers/:id` | qualquer | 200 com o objeto do cliente; 404 `{"msg":"nao encontrado"}` |
-| `POST /v1/customers` | admin | 201 `{"id": n, "msg": "cadastrado"}`; 409 `{"erro":"email duplicado"}`; 400 (corpo padrão do Fastify, armadilha 9) |
+| `GET /v1/health` | public | 200 `{"status":"UP"}` |
+| `GET /v1/auth/whoami` | any | 200 `{"tokenId","name","role"}` |
+| `GET /v1/customers` | any | 200 `{"qtd": <filtered total>, "dados": [...]}`; 400 `{"erro":"parametro invalido: <name>"}` |
+| `GET /v1/customers/:id` | any | 200 with the customer object; 404 `{"msg":"nao encontrado"}` |
+| `POST /v1/customers` | admin | 201 `{"id": n, "msg": "cadastrado"}`; 409 `{"erro":"email duplicado"}`; 400 (Fastify's default body, trap 9) |
 | `PUT /v1/customers/:id` | admin | 200 `{"id": n, "msg": "atualizado"}`; 404; 409; 400 |
 | `DELETE /v1/customers/:id` | admin | 200 `{"id": n, "msg": "removido"}`; 404 |
 
-Qualquer rota: 500 `{"erro":"erro interno"}` numa falha inesperada (o detalhe vai só para o log; a armadilha 6 é a única exceção) e, para uma rota que não existe, 404 `{"msg":"nao encontrado"}` depois da autenticação.
+Any route: 500 `{"erro":"erro interno"}` on an unexpected failure (the detail goes only to the log; trap 6 is the only exception) and, for a route that does not exist, 404 `{"msg":"nao encontrado"}` after authentication.
 
-Filtros da listagem: `nm` (trecho do nome, sem acento e sem caixa), `eml` (exato, sem caixa), `phn` (só dígitos, exato), `sts` (`A`/`I`), `seg` (`1` retail, `2` smb, `3` enterprise), `dt_de` e `dt_ate` (`YYYYMMDD`, inclusivos), `lim` (1 a 500) e `off` (>= 0). Ordem: nome normalizado e `cst_id`.
+The legacy API's response bodies keep their original Portuguese keys and messages on purpose (`qtd`, `dados`, `erro`, `msg`), as part of the legacy contract.
 
-## Armadilhas deliberadas
+Listing filters: `nm` (part of the name, accent- and case-insensitive), `eml` (exact, case-insensitive), `phn` (digits only, exact), `sts` (`A`/`I`), `seg` (`1` retail, `2` smb, `3` enterprise), `dt_de` and `dt_ate` (`YYYYMMDD`, inclusive), `lim` (1 to 500) and `off` (>= 0). Order: normalized name and `cst_id`.
 
-Comportamentos de sistema legado mantidos de propósito; o servidor MCP é que as esconde atrás das ações de negócio.
+## Deliberate traps
 
-1. `GET /v1/customers` sem `lim` devolve **todos** os clientes filtrados.
-2. Parâmetros desconhecidos (por exemplo `name=`) são **ignorados em silêncio**: a listagem volta sem aquele filtro.
-3. A listagem tem envelope (`qtd`, `dados`); o `GET /v1/customers/:id` devolve o objeto **sem envelope**.
-4. O `POST` devolve só o id, não o objeto criado.
-5. O `PUT` exige o objeto **completo** (`cst_nm`, `cst_phn`, `cst_eml`, `cst_sts`, `cst_seg`); falta de campo dá 400.
-6. Se o corpo do `PUT` contiver `cst_id`, a API responde **500 com a mensagem bruta do SQLite**, como no caso de atualização com identificador no corpo visto na aula 203485 (`PUT` com objeto completo).
-7. O `DELETE` é físico. O servidor MCP não o expõe.
-8. Nomes de campo crípticos e mensagens sem acento (`nao encontrado`, `parametro invalido`).
-9. Os erros de corpo (400 de validação ou de JSON malformado, 413) vêm no formato padrão do Fastify, em inglês (`statusCode`, `code`, `error` e `message`, que na validação nomeia o campo), diferente do `{"erro": ...}` das outras respostas.
+Legacy system behaviors kept on purpose; the MCP server is what hides them behind the business actions.
 
-## Segurança
+1. `GET /v1/customers` without `lim` returns **all** the filtered customers.
+2. Unknown parameters (for example `name=`) are **silently ignored**: the listing comes back without that filter.
+3. The listing has an envelope (`qtd`, `dados`); `GET /v1/customers/:id` returns the object **with no envelope**.
+4. `POST` returns only the id, not the created object.
+5. `PUT` requires the **full** object (`cst_nm`, `cst_phn`, `cst_eml`, `cst_sts`, `cst_seg`); a missing field gives 400.
+6. If the `PUT` body contains `cst_id`, the API answers **500 with the raw SQLite message**, like the update-with-id-in-the-body case seen in lesson 203485 (`PUT` with the full object).
+7. `DELETE` is physical. The MCP server does not expose it.
+8. Cryptic field names and messages without accents (`nao encontrado`, `parametro invalido`).
+9. Body errors (400 for validation or malformed JSON, 413) come in Fastify's default format, in English (`statusCode`, `code`, `error` and `message`, which on validation names the field), unlike the `{"erro": ...}` of the other responses.
 
-Ordem dos hooks em cada pedido: balde por IP, autenticação, balde por token e, nas rotas de escrita, o papel.
+## Security
 
-- **401** `{"erro":"nao autorizado"}`: o mesmo corpo para token ausente, malformado, desconhecido, revogado ou expirado.
-- **403** `{"erro":"proibido","papel_necessario":"admin"}`: token `member` em `POST`, `PUT` ou `DELETE`. O papel vem só do registro do token no banco; cabeçalhos ou campos `role` enviados pelo cliente são ignorados.
-- **429** `{"erro":"limite excedido"}` com `retry-after` em segundos.
-- **Limites:** 90 pedidos por token e 180 por IP a cada 60 s, em janela fixa (na virada da janela, até o dobro passa em sequência; ver `docs/security.md`). O balde de IP conta antes da autenticação, inclusive os pedidos que terminam em 401. `GET /v1/health` fica fora dos dois baldes.
-- **Cabeçalhos de limite:** toda resposta de rota protegida traz `x-ratelimit-limit`, `x-ratelimit-remaining` e `x-ratelimit-scope` (`ip` ou `token`) do balde que decidiu: `ip` num 429 de IP e num 401; `token` no resto.
-- **Clientes na mesma máquina:** VS Code, Inspector, demo e agente rodando localmente dividem os 180 pedidos por minuto de `127.0.0.1`. Um 429 com `x-ratelimit-scope: ip` pode aparecer mesmo com cada token abaixo de 90.
-- **`x-request-id`:** a API adota o valor recebido só se for um UUID; caso contrário gera um novo. O valor final volta no cabeçalho da resposta e aparece nos logs.
-- **Logs:** uma linha JSON por evento (pino), com o cabeçalho `Authorization` redigido, tokens mascarados na URL logada (`?token=slm_<id>_***`, se alguém colar o token na query string; ele não autentica) e uma linha `audit` por escrita (`tokenId`, `role`, método, rota e status).
-- **Porta ocupada:** a API sai com código 1 e uma linha curta (`porta 9999 em uso em 127.0.0.1; escolha outra com PORT`), sem stack.
-- **Corpo:** no máximo 16 KiB (413 acima disso). O IP vem do socket; `X-Forwarded-For` é ignorado.
+Hook order on each request: IP bucket, authentication, token bucket and, on write routes, the role.
+
+- **401** `{"erro":"nao autorizado"}`: the same body for a missing, malformed, unknown, revoked or expired token.
+- **403** `{"erro":"proibido","papel_necessario":"admin"}`: a `member` token on `POST`, `PUT` or `DELETE`. The role comes only from the token record in the database; `role` headers or fields sent by the client are ignored.
+- **429** `{"erro":"limite excedido"}` with `retry-after` in seconds.
+- **Limits:** 90 requests per token and 180 per IP every 60 s, in a fixed window (at the window rollover, up to twice the limit gets through in sequence; see `docs/security.md`). The IP bucket counts before authentication, including requests that end in 401. `GET /v1/health` is outside both buckets.
+- **Limit headers:** every response from a protected route carries `x-ratelimit-limit`, `x-ratelimit-remaining` and `x-ratelimit-scope` (`ip` or `token`) of the bucket that decided: `ip` on an IP 429 and on a 401; `token` on the rest.
+- **Clients on the same machine:** VS Code, Inspector, the demo and the agent running locally share the 180 requests per minute of `127.0.0.1`. A 429 with `x-ratelimit-scope: ip` can show up even with each token under 90.
+- **`x-request-id`:** the API adopts the received value only if it is a UUID; otherwise it generates a new one. The final value comes back in the response header and appears in the logs.
+- **Logs:** one JSON line per event (pino), with the `Authorization` header redacted, tokens masked in the logged URL (`?token=slm_<id>_***`, if someone pastes the token in the query string; it does not authenticate) and one `audit` line per write (`tokenId`, `role`, method, route and status).
+- **Port in use:** the API exits with code 1 and a short line (`port 9999 in use on 127.0.0.1; pick another one with PORT`), with no stack.
+- **Body:** at most 16 KiB (413 above that). The IP comes from the socket; `X-Forwarded-For` is ignored.

@@ -1,66 +1,66 @@
 # AGENTS.md
 
-Instruções para agentes de código (e pessoas) que mexem neste repositório. Fatos, não sugestões.
+Instructions for coding agents (and people) working in this repository. Facts, not suggestions.
 
-## Comandos
+## Commands
 
 ```bash
-npm ci                    # instala; o aviso do postinstall do esbuild é esperado, não aprove scripts
-npm test                  # suíte inteira, sem rede (guarda tests/support/no-network.ts)
+npm ci                    # install; the esbuild postinstall warning is expected, do not approve scripts
+npm test                  # the whole suite, no network (guard in tests/support/no-network.ts)
 npm run typecheck         # tsc --noEmit (TypeScript 7)
-npm run demo              # demo de um comando: API em processo + MCP stdio + 10 passos
-npm run bench:tokens      # regenera a tabela de tokens do README e docs/token-comparison.md
-npm run test:pack         # npm pack + npx do tarball + tools/list com Client real
-npm run agent:demo        # agente LangChain com modelo fake (extra opcional)
-npm run test:live         # agente com modelo real; pula sem OPENROUTER_API_KEY
-npm run hooks:install     # uma vez por clone: usa .githooks/pre-commit
+npm run demo              # one-command demo: in-process API + MCP stdio + 10 steps
+npm run bench:tokens      # regenerates the token table in the README and docs/token-comparison.md
+npm run test:pack         # npm pack + npx from the tarball + tools/list with a real Client
+npm run agent:demo        # LangChain agent with a fake model (optional extra)
+npm run test:live         # agent with a real model; skips without OPENROUTER_API_KEY
+npm run hooks:install     # once per clone: uses .githooks/pre-commit
 ```
 
-Node 24 (`.nvmrc`). TypeScript roda direto no Node, sem build; imports relativos com extensão `.ts`.
+Node 24 (`.nvmrc`). TypeScript runs directly on Node, with no build; relative imports use the `.ts` extension.
 
-## Mapa
+## Map
 
-- `src/legacy-api/`: API legada (Fastify + `node:sqlite`), tokens, RBAC, rate limit, CLI. Não vai no pacote.
-- `src/mcp/`: servidor MCP. Camadas: `domain` (schemas Zod, erros, porta) -> `infrastructure` (único lugar com HTTP) -> `application` (service) -> `tools`, `resources`, `prompts`.
-- `src/shared/`: logger, redação, relógio, padrão de token. Não importa `src/mcp` nem `src/legacy-api`.
-- `scripts/`: demo, verificação do pacote, comparativo de tokens. `examples/agent/`: agente LangChain.
-- `specs/`: constituição e specs SDD com critérios EARS. `docs/adr/`: decisões.
+- `src/legacy-api/`: legacy API (Fastify + `node:sqlite`), tokens, RBAC, rate limit, CLI. Not in the package.
+- `src/mcp/`: MCP server. Layers: `domain` (Zod schemas, errors, port) -> `infrastructure` (the only place with HTTP) -> `application` (service) -> `tools`, `resources`, `prompts`.
+- `src/shared/`: logger, redaction, clock, token pattern. Imports neither `src/mcp` nor `src/legacy-api`.
+- `scripts/`: demo, package verification, token comparison. `examples/agent/`: LangChain agent.
+- `specs/`: constitution and SDD specs with EARS criteria. `docs/adr/`: decisions.
 
-## Regras de dependência (testadas em tests/repo/conventions.unit.test.ts)
+## Dependency rules (tested in tests/repo/conventions.unit.test.ts)
 
-1. `src/mcp/**` nunca importa `src/legacy-api/**`.
-2. `src/shared/**` não importa `src/mcp` nem `src/legacy-api`.
-3. `tools`, `resources` e `prompts` só chamam o service; o service só conhece a porta `CustomerGateway`; só a `infrastructure` faz HTTP.
-4. Em `src/` e `examples/`, só `main.ts`, `cli/tokens.ts` e `examples/agent/config.ts` leem `process.env`.
-5. Sem `enum`, `namespace` nem parameter properties (`erasableSyntaxOnly`). Fábricas de funções no lugar de classes com estado.
+1. `src/mcp/**` never imports `src/legacy-api/**`.
+2. `src/shared/**` imports neither `src/mcp` nor `src/legacy-api`.
+3. `tools`, `resources` and `prompts` only call the service; the service only knows the `CustomerGateway` port; only `infrastructure` does HTTP.
+4. In `src/` and `examples/`, only `main.ts`, `cli/tokens.ts` and `examples/agent/config.ts` read `process.env`.
+5. No `enum`, `namespace` or parameter properties (`erasableSyntaxOnly`). Function factories instead of stateful classes.
 
-## stdout do MCP
+## MCP stdout
 
-stdout do processo MCP é só JSON-RPC. `src/mcp` nunca usa `console.log`, `console.info`, `console.debug` nem `process.stdout.write`. Log vai para stderr pelo `Logger` (`src/shared/logger.ts`), uma linha JSON por evento.
+The MCP process's stdout is JSON-RPC only. `src/mcp` never uses `console.log`, `console.info`, `console.debug` or `process.stdout.write`. Logs go to stderr through the `Logger` (`src/shared/logger.ts`), one JSON line per event.
 
-## Testes
+## Tests
 
-- TDD: o teste falha antes da implementação.
-- Teste que prova um critério EARS começa o nome por `[ID]` (ex.: `[MCP-05] ...`). O `conventions.unit` exige um teste para cada ID dos `specs/*/spec.md` (exceções: `PKG-02` em `scripts/verify-pack.ts`, `AGT-06` em `tests/live/agent.live.ts`).
-- `npm test` nunca usa rede nem chave. Cada teste cria a própria API `:memory:`, os próprios tokens e o próprio servidor MCP, e limpa com `t.after`.
-- Sufixos: `*.unit.test.ts`, `*.int.test.ts`, `*.e2e.test.ts`; `tests/live/*.live.ts` fica fora do `npm test`.
-- Igualdade de texto só para constantes: catálogo de erros, prompts, `instructions`.
+- TDD: the test fails before the implementation.
+- A test that proves an EARS criterion starts its name with `[ID]` (e.g. `[MCP-05] ...`). `conventions.unit` requires a test for every ID in `specs/*/spec.md` (exceptions: `PKG-02` in `scripts/verify-pack.ts`, `AGT-06` in `tests/live/agent.live.ts`).
+- `npm test` never uses the network or a key. Each test creates its own `:memory:` API, its own tokens and its own MCP server, and cleans up with `t.after`.
+- Suffixes: `*.unit.test.ts`, `*.int.test.ts`, `*.e2e.test.ts`; `tests/live/*.live.ts` stays out of `npm test`.
+- Text equality only for constants: error catalog, prompts, `instructions`.
 
-## Onde fica cada contrato
+## Where each contract lives
 
-- Catálogo de erros das tools: `src/mcp/domain/errors.ts` (`errorMessage`), formatado por `src/mcp/tools/define-tool.ts`.
-- Schemas de domínio: `src/mcp/domain/customer.ts`. De-para do legado: `src/mcp/infrastructure/legacy-mapper.ts`.
-- Contrato da API legada: `docs/legacy-api/openapi.json` (checado contra as rotas).
+- Tool error catalog: `src/mcp/domain/errors.ts` (`errorMessage`), formatted by `src/mcp/tools/define-tool.ts`.
+- Domain schemas: `src/mcp/domain/customer.ts`. Legacy mapping: `src/mcp/infrastructure/legacy-mapper.ts`.
+- Legacy API contract: `docs/legacy-api/openapi.json` (checked against the routes).
 
-## Antes do commit
+## Before committing
 
-- Mudou `description`, `describe` ou schema de tool: rode `npm run bench:tokens` antes do commit. O `npm test` falha se a tabela do README estiver desatualizada (BEN-02).
-- O hook `.githooks/pre-commit` roda `npm run typecheck` e `npm test`.
-- Nada de `git push`, `npm publish` ou repositório remoto sem o dono do projeto validar.
-- Dependências com versão exata (`.npmrc` com `save-exact=true`). Runtime tem só 3: `@modelcontextprotocol/sdk`, `zod`, `tsx`.
-- Nenhum token real em arquivo versionado. Em documentação, use `slm_<id>_<segredo>`.
+- If you changed a tool's `description`, `describe` or schema: run `npm run bench:tokens` before committing. `npm test` fails if the README table is out of date (BEN-02).
+- The `.githooks/pre-commit` hook runs `npm run typecheck` and `npm test`.
+- No `git push`, `npm publish` or remote repository until the project owner has validated.
+- Exact dependency versions (`.npmrc` with `save-exact=true`). Runtime has only 3: `@modelcontextprotocol/sdk`, `zod`, `tsx`.
+- No real token in any versioned file. In documentation, use `slm_<id>_<secret>`.
 
-## Idioma e conteúdo
+## Language and content
 
-- Código, identificadores e textos voltados ao modelo em inglês. README e documentação em português.
-- Nunca copie transcrição, slide ou material autoral do curso. Aulas são citadas só por ID e tema.
+- Code, identifiers and model-facing text in English. README and documentation in English.
+- Never copy course transcripts, slides or authored material. Lessons are cited only by ID and topic.

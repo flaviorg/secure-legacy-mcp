@@ -1,45 +1,45 @@
-# Clientes MCP: VS Code, Cursor, Claude Desktop e Inspector
+# MCP clients: VS Code, Cursor, Claude Desktop and Inspector
 
-> **English summary:** how to connect MCP clients to the `secure-legacy-mcp` stdio server. Only `.vscode/mcp.json` is versioned, and it asks for the service token through a password input. Cursor and Claude Desktop appear here as snippets with the `slm_<id>_<segredo>` placeholder: their config files hold the token in plain text, so they never go into a repository.
+> **Summary:** how to connect MCP clients to the `secure-legacy-mcp` stdio server. Only `.vscode/mcp.json` is versioned, and it asks for the service token through a password input. Cursor and Claude Desktop appear here as snippets with the `slm_<id>_<secret>` placeholder: their config files hold the token in plain text, so they never go into a repository.
 
-Todos os clientes seguem os mesmos três passos: subir a API legada, emitir um token pela CLI e iniciar o servidor MCP pelo cliente, que passa o token na variável `SERVICE_TOKEN`. O servidor precisa de Node 24 (roda TypeScript direto, sem build).
+All clients follow the same three steps: start the legacy API, issue a token through the CLI, and start the MCP server from the client, which passes the token in the `SERVICE_TOKEN` variable. The server needs Node 24 (it runs TypeScript directly, with no build).
 
-## Antes de qualquer cliente
+## Before any client
 
 ```bash
-npm run api                                              # API em http://127.0.0.1:9999
-npm run tokens -- issue --name vscode --role member      # copie o token agora: ele não aparece de novo
+npm run api                                              # API at http://127.0.0.1:9999
+npm run tokens -- issue --name vscode --role member      # copy the token now: it is not shown again
 ```
 
-- Use `member` para só leitura (`getCustomer`, `searchCustomers`). As escritas (`createCustomer`, `updateCustomerContact`, `deactivateCustomer`) exigem um token `admin`; com `member`, elas devolvem `[FORBIDDEN]`.
-- Um token por cliente (`--name vscode`, `--name cursor`, ...) deixa o log da API dizer quem fez o quê e permite revogar só um deles com `npm run tokens -- revoke <id>`. A revogação vale na chamada seguinte, sem reiniciar nada.
-- Se a API estiver fora do ar, o servidor MCP sobe assim mesmo e as tools respondem `[UPSTREAM_UNAVAILABLE]` até ela voltar.
-- Nunca configure um cliente com `npm run mcp` como comando: o npm escreve o banner `> secure-legacy-mcp@0.1.0 mcp` no stdout antes do JSON-RPC e corrompe o canal. Use `node .../src/mcp/main.ts` (como nos trechos abaixo) ou o binário do pacote. Para rodar à mão no terminal, `npm run -s mcp` não imprime o banner.
+- Use `member` for read-only (`getCustomer`, `searchCustomers`). The writes (`createCustomer`, `updateCustomerContact`, `deactivateCustomer`) require an `admin` token; with `member`, they return `[FORBIDDEN]`.
+- One token per client (`--name vscode`, `--name cursor`, ...) lets the API log say who did what and lets you revoke just one of them with `npm run tokens -- revoke <id>`. Revocation takes effect on the next call, with nothing to restart.
+- If the API is down, the MCP server starts anyway and the tools answer `[UPSTREAM_UNAVAILABLE]` until it is back.
+- Never configure a client with `npm run mcp` as the command: npm writes the `> secure-legacy-mcp@0.1.0 mcp` banner to stdout before the JSON-RPC and corrupts the channel. Use `node .../src/mcp/main.ts` (as in the snippets below) or the package binary. To run it by hand in a terminal, `npm run -s mcp` does not print the banner.
 
 ## VS Code
 
-A config versionada está em [`.vscode/mcp.json`](../../.vscode/mcp.json). Ela inicia `node ${workspaceFolder}/src/mcp/main.ts` com `LEGACY_API_URL=http://127.0.0.1:9999` e pede o token por um `input` do tipo `promptString` com `password: true`. O token fica guardado pelo VS Code, fora do arquivo.
+The versioned config is at [`.vscode/mcp.json`](../../.vscode/mcp.json). It starts `node ${workspaceFolder}/src/mcp/main.ts` with `LEGACY_API_URL=http://127.0.0.1:9999` and asks for the token through an `input` of type `promptString` with `password: true`. VS Code stores the token, outside the file.
 
-1. Com a API no ar e um token emitido, abra a pasta do projeto no VS Code.
-2. Abra `.vscode/mcp.json` e clique em **Start** acima de `secure-legacy-mcp` (ou rode o comando **MCP: List Servers**).
-3. Cole o token no prompt de senha.
-4. Abra um chat **novo** no modo agente. Um chat aberto antes de o servidor subir não enxerga as tools (armadilha vista na aula 221518, sobre a disciplina do stdio e as configs de editor).
-5. Peça, por exemplo, "procure o cliente teodoro". O VS Code deve chamar `getCustomer`.
+1. With the API up and a token issued, open the project folder in VS Code.
+2. Open `.vscode/mcp.json` and click **Start** above `secure-legacy-mcp` (or run the **MCP: List Servers** command).
+3. Paste the token into the password prompt.
+4. Open a **new** chat in agent mode. A chat opened before the server started does not see the tools (a trap seen in lesson 221518, on stdio discipline and editor configs).
+5. Ask, for example, "find the customer teodoro". VS Code should call `getCustomer`.
 
-Para trocar o token, limpe o input guardado pelos comandos `MCP:` da paleta de comandos e reinicie o servidor: o VS Code pede o token de novo.
+To change the token, clear the stored input with the `MCP:` commands in the command palette and restart the server: VS Code asks for the token again.
 
 ## Cursor
 
-O Cursor lê `mcpServers` de `.cursor/mcp.json` (no projeto) ou de `~/.cursor/mcp.json` (global). Ele não tem input de senha, então o token fica escrito no arquivo: mantenha esse arquivo fora de qualquer repositório e prefira um token `member` só para ele.
+Cursor reads `mcpServers` from `.cursor/mcp.json` (in the project) or from `~/.cursor/mcp.json` (global). It has no password input, so the token is written in the file: keep that file out of any repository and prefer a `member` token just for it.
 
 ```json
 {
   "mcpServers": {
     "secure-legacy-mcp": {
       "command": "node",
-      "args": ["/caminho/absoluto/para/secure-legacy-mcp/src/mcp/main.ts"],
+      "args": ["/absolute/path/to/secure-legacy-mcp/src/mcp/main.ts"],
       "env": {
-        "SERVICE_TOKEN": "slm_<id>_<segredo>",
+        "SERVICE_TOKEN": "slm_<id>_<secret>",
         "LEGACY_API_URL": "http://127.0.0.1:9999"
       }
     }
@@ -47,22 +47,22 @@ O Cursor lê `mcpServers` de `.cursor/mcp.json` (no projeto) ou de `~/.cursor/mc
 }
 ```
 
-Use caminho absoluto em `args`. O env contém só as duas variáveis de que o servidor precisa; não injete o `.env` inteiro, que pode ter chaves de outros serviços.
+Use an absolute path in `args`. The env holds only the two variables the server needs; do not inject the whole `.env`, which may have keys for other services.
 
 ## Claude Desktop
 
-No macOS, o arquivo é `~/Library/Application Support/Claude/claude_desktop_config.json`. Depois de editar, feche e abra o Claude Desktop.
+On macOS, the file is `~/Library/Application Support/Claude/claude_desktop_config.json`. After editing, quit and reopen Claude Desktop.
 
-Hoje, rodando do clone do repositório:
+Today, running from the repository clone:
 
 ```json
 {
   "mcpServers": {
     "secure-legacy-mcp": {
-      "command": "/caminho/absoluto/para/node",
-      "args": ["/caminho/absoluto/para/secure-legacy-mcp/src/mcp/main.ts"],
+      "command": "/absolute/path/to/node",
+      "args": ["/absolute/path/to/secure-legacy-mcp/src/mcp/main.ts"],
       "env": {
-        "SERVICE_TOKEN": "slm_<id>_<segredo>",
+        "SERVICE_TOKEN": "slm_<id>_<secret>",
         "LEGACY_API_URL": "http://127.0.0.1:9999"
       }
     }
@@ -70,7 +70,7 @@ Hoje, rodando do clone do repositório:
 }
 ```
 
-Depois de uma publicação futura no npm, o mesmo servidor pode subir pelo binário do pacote:
+After a future npm publication, the same server can start from the package binary:
 
 ```json
 {
@@ -79,7 +79,7 @@ Depois de uma publicação futura no npm, o mesmo servidor pode subir pelo biná
       "command": "npx",
       "args": ["-y", "secure-legacy-mcp"],
       "env": {
-        "SERVICE_TOKEN": "slm_<id>_<segredo>",
+        "SERVICE_TOKEN": "slm_<id>_<secret>",
         "LEGACY_API_URL": "http://127.0.0.1:9999"
       }
     }
@@ -87,7 +87,7 @@ Depois de uma publicação futura no npm, o mesmo servidor pode subir pelo biná
 }
 ```
 
-**Armadilha do `PATH` com nvm:** apps de interface gráfica não carregam o perfil do shell, então `node` e `npx` instalados pelo nvm não estão no `PATH` do Claude Desktop. O sintoma é o servidor aparecer como falho logo ao abrir. A correção é usar o caminho absoluto: `which node` (ou `which npx`) no terminal, com o Node 24 ativo, e colar o resultado em `command`. Com `npx`, o `PATH` do processo também precisa achar o `node` certo; se não achar, acrescente `"PATH": "<pasta do node 24>:/usr/bin:/bin"` ao `env`.
+**The `PATH` trap with nvm:** graphical apps do not load the shell profile, so `node` and `npx` installed by nvm are not on Claude Desktop's `PATH`. The symptom is the server showing up as failed right when the app opens. The fix is to use the absolute path: run `which node` (or `which npx`) in the terminal, with Node 24 active, and paste the result into `command`. With `npx`, the process's `PATH` also needs to find the right `node`; if it does not, add `"PATH": "<node 24 folder>:/usr/bin:/bin"` to the `env`.
 
 ## Inspector
 
@@ -95,8 +95,8 @@ Depois de uma publicação futura no npm, o mesmo servidor pode subir pelo biná
 npm run mcp:inspect
 ```
 
-Abre o MCP Inspector no navegador com o servidor em `node src/mcp/main.ts`, lendo `SERVICE_TOKEN` e `LEGACY_API_URL` do `.env` na raiz. Na primeira vez, o `npx` baixa o Inspector, o que exige rede. Sem `.env`, o Node escreve no stderr um aviso de arquivo ausente e segue; nesse caso o servidor sai com código 1 e `config_invalid` no stderr, porque falta `SERVICE_TOKEN`.
+Opens the MCP Inspector in the browser with the server at `node src/mcp/main.ts`, reading `SERVICE_TOKEN` and `LEGACY_API_URL` from the `.env` at the root. The first time, `npx` downloads the Inspector, which needs the network. Without a `.env`, Node writes a missing-file warning to stderr and carries on; in that case the server exits with code 1 and `config_invalid` on stderr, because `SERVICE_TOKEN` is missing.
 
-## Vários clientes na mesma máquina
+## Several clients on the same machine
 
-O limite por IP (180 pedidos por minuto) é aplicado antes da autenticação e vale para `127.0.0.1` inteiro. VS Code, Cursor, Claude Desktop, Inspector e o demo rodando juntos dividem esse balde. Por isso um `[RATE_LIMITED]` com `scope: "ip"` no `_meta` pode aparecer mesmo com cada token abaixo do seu limite de 90 pedidos por minuto. O texto do erro já traz em quantos segundos tentar de novo.
+The per-IP limit (180 requests per minute) is applied before authentication and covers all of `127.0.0.1`. VS Code, Cursor, Claude Desktop, Inspector and the demo running together share this bucket. That is why a `[RATE_LIMITED]` with `scope: "ip"` in the `_meta` can show up even with each token under its 90-requests-per-minute limit. The error text already says in how many seconds to try again.

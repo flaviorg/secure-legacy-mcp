@@ -10,7 +10,7 @@ import { createChatModel } from '../../examples/agent/model.ts';
 import { startTestApi } from '../support/api-harness.ts';
 
 const apiKey = process.env.OPENROUTER_API_KEY?.trim();
-const skip = apiKey ? false : 'OPENROUTER_API_KEY ausente';
+const skip = apiKey ? false : 'OPENROUTER_API_KEY is not set';
 
 async function liveAgent(t: TestContext) {
   const config = loadAgentConfig({ LLM_PROVIDER: 'openrouter', OPENROUTER_API_KEY: apiKey, OPENROUTER_MODEL: process.env.OPENROUTER_MODEL });

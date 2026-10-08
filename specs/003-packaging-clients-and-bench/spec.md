@@ -1,66 +1,66 @@
-# 003: Pacote, clientes, comparativo de tokens e repositório
+# 003: Package, clients, token comparison and repository
 
-Status: implementado (marcos M7, M8 e M10), com a verificação manual no VS Code pendente (ver "Dúvidas resolvidas"). Decisões: ADRs 0001 e 0006.
+Status: implemented (milestones M7, M8 and M10), with the manual VS Code check pending (see "Resolved questions"). Decisions: ADRs 0001 and 0006.
 
-## Contexto
+## Context
 
-O servidor MCP sai como pacote `npx` (binário com `tsx`, `files` restrito a `bin/`, `src/mcp/`, `src/shared/`, `README.md` e `LICENSE`), validado com `npm pack` e `npx` do tarball, sem publicar. Só o `.vscode/mcp.json` é versionado, pedindo o token por input de senha; Cursor e Claude Desktop ficam como trechos em `docs/clients/README.md`. O comparativo de tokens mede o espelho REST gerado do OpenAPI contra as ações de negócio. O repositório carrega o próprio processo: `AGENTS.md`, `.env.example`, hook de pre-commit e guarda de rede nos testes.
+The MCP server ships as an `npx` package (a binary with `tsx`, `files` restricted to `bin/`, `src/mcp/`, `src/shared/`, `README.md` and `LICENSE`), validated with `npm pack` and `npx` from the tarball, without publishing. Only `.vscode/mcp.json` is versioned, asking for the token through a password input; Cursor and Claude Desktop stay as snippets in `docs/clients/README.md`. The token comparison measures the REST mirror generated from OpenAPI against the business actions. The repository carries its own process: `AGENTS.md`, `.env.example`, a pre-commit hook and a network guard in the tests.
 
-## Critérios de aceite
+## Acceptance criteria
 
-**Pacote e clientes**
+**Package and clients**
 
-- **PKG-01** Quando `npm pack` gerar o tarball, ele deve conter apenas `bin/`, `src/mcp/`, `src/shared/`, `package.json`, `README.md` e `LICENSE`.
-- **PKG-02** Quando o tarball for instalado num diretório temporário, o comando `secure-legacy-mcp` executado via `npx` deve responder `tools/list` a um `Client` real com as 5 tools.
-- **PKG-03** O `.vscode/mcp.json` deve ser JSON válido e pedir o token por `input` com `password: true`, e nenhum arquivo versionado fora de `tests/` (inclusive `docs/clients/README.md`) deve conter uma string com formato de token.
-- **PKG-04** O código em `src/mcp` não deve importar `src/legacy-api` nem usar `console.log`, `console.info`, `console.debug` ou `process.stdout.write`.
+- **PKG-01** When `npm pack` produces the tarball, it shall contain only `bin/`, `src/mcp/`, `src/shared/`, `package.json`, `README.md` and `LICENSE`.
+- **PKG-02** When the tarball is installed in a temporary directory, the `secure-legacy-mcp` command run through `npx` shall answer `tools/list` to a real `Client` with the 5 tools.
+- **PKG-03** `.vscode/mcp.json` shall be valid JSON and ask for the token through an `input` with `password: true`, and no versioned file outside `tests/` (including `docs/clients/README.md`) shall contain a string in the token format.
+- **PKG-04** The code in `src/mcp` shall not import `src/legacy-api` nor use `console.log`, `console.info`, `console.debug` or `process.stdout.write`.
 
-**Comparativo de tokens**
+**Token comparison**
 
-- **BEN-01** Quando o medidor rodar duas vezes sobre o mesmo código, ele deve produzir saída byte a byte idêntica.
-- **BEN-02** O bloco entre `<!-- token-table:start -->` e `<!-- token-table:end -->` no README deve ser igual à saída do medidor; caso contrário, o teste falha.
-- **BEN-03** As definições do espelho REST devem ser geradas de `docs/legacy-api/openapi.json` por uma função pura (sem edição manual), e cada operação do OpenAPI deve existir como rota na API, que tem exatamente as 7 rotas da seção 5.2 da spec de design.
+- **BEN-01** When the meter runs twice over the same code, it shall produce byte-for-byte identical output.
+- **BEN-02** The block between `<!-- token-table:start -->` and `<!-- token-table:end -->` in the README shall equal the meter's output; otherwise, the test fails.
+- **BEN-03** The REST mirror definitions shall be generated from `docs/legacy-api/openapi.json` by a pure function (no manual editing), and each OpenAPI operation shall exist as a route on the API, which has exactly the 7 routes from section 5.2 of the design spec.
 
-**Repositório**
+**Repository**
 
-- **REP-01** `AGENTS.md` deve ter no máximo 100 linhas.
-- **REP-02** `.env.example` deve listar toda variável lida pelos schemas de config da API, do MCP e do agente.
-- **REP-03** Se qualquer teste do `npm test` tentar conectar a um host fora de loopback, então a conexão deve falhar com erro da guarda de rede.
-- **REP-04** O hook `.githooks/pre-commit` deve existir, ser executável e rodar `npm run typecheck` e `npm test`, abortando o commit se algum falhar.
+- **REP-01** `AGENTS.md` shall have at most 100 lines.
+- **REP-02** `.env.example` shall list every variable read by the API, MCP and agent config schemas.
+- **REP-03** If any `npm test` test tries to connect to a host outside loopback, then the connection shall fail with an error from the network guard.
+- **REP-04** The `.githooks/pre-commit` hook shall exist, be executable and run `npm run typecheck` and `npm test`, aborting the commit if either fails.
 
 ## Non-goals
 
-| Fora do escopo | Motivo |
+| Out of scope | Reason |
 |---|---|
-| Publicar no npm ou subir Verdaccio | Nada é publicado sem validação do dono; `npm pack` + `npx` do tarball prova o binário |
-| Configs versionadas para Cursor e Claude Desktop | Arquivo versionado com token é o risco que se quer evitar (D-17); viram trechos com placeholder `slm_<id>_<segredo>` |
-| Servidor MCP low-level para o espelho REST | Ele só ecoaria as definições geradas; o comparativo mede o JSON direto |
-| Matriz de versões do Node no CI | Validado só em Node 24; `engines` declara `>=24` |
-| Portão de cobertura | Boa parte do código roda em processo filho, sem instrumentação; o CI publica o relatório sem limite mínimo |
-| Testes em Windows | Scripts portáveis por construção, CI só em Ubuntu |
+| Publishing to npm or standing up Verdaccio | Nothing is published without the owner's validation; `npm pack` + `npx` from the tarball proves the binary |
+| Versioned configs for Cursor and Claude Desktop | A versioned file with a token is the risk we want to avoid (D-17); they become snippets with the `slm_<id>_<secret>` placeholder |
+| Low-level MCP server for the REST mirror | It would only echo the generated definitions; the comparison measures the JSON directly |
+| Node version matrix in CI | Validated only on Node 24; `engines` declares `>=24` |
+| Coverage gate | A good part of the code runs in a child process, without instrumentation; CI publishes the report with no minimum |
+| Tests on Windows | Scripts are portable by construction, CI only on Ubuntu |
 
-## Dúvidas resolvidas
+## Resolved questions
 
-- **Node 22 não é declarado.** Pisos registrados: type stripping sem flag a partir de 22.18, `node:sqlite` sem flag a partir de 22.13, `--env-file-if-exists` a partir de 22.9, e o `@modelcontextprotocol/inspector` 2.9.0 exige 22.19. O binário roda via `tsx` e provavelmente funciona em 22.x, mas isso não é testado.
-- **`tsx` 4.23.15:** `import { register } from 'tsx/esm/api'; register();` no binário carrega `src/mcp/main.ts` com `await` de topo, conferido pelo `npm run test:pack` a partir do tarball. O `npm ci` avisa que o `postinstall` do `esbuild` (e o do `fsevents`, opcional no macOS) não está aprovado; o aviso é esperado e o `tsx` funciona sem ele (ADR 0006).
-- **`npx --package <tgz>`** instala o pacote no próprio cache (`~/.npm/_npx`); o diretório temporário do `verify-pack.ts` só guarda o tarball e serve de `cwd`, por isso a saída diz "diretório temporário" e não "instalado em". Com a guarda de rede no `NODE_OPTIONS`, um pedido do npm falha com `NO_NETWORK` e o npm cai no cache: localmente o `test:pack` passou sem rede. No CI o cache começa frio e o job `pack` usa a rede.
+- **Node 22 is not declared.** Recorded floors: type stripping without a flag from 22.18, `node:sqlite` without a flag from 22.13, `--env-file-if-exists` from 22.9, and `@modelcontextprotocol/inspector` 2.9.0 requires 22.19. The binary runs through `tsx` and probably works on 22.x, but that is not tested.
+- **`tsx` 4.23.15:** `import { register } from 'tsx/esm/api'; register();` in the binary loads `src/mcp/main.ts` with a top-level `await`, checked by `npm run test:pack` from the tarball. `npm ci` warns that the `postinstall` of `esbuild` (and that of `fsevents`, optional on macOS) is not approved; the warning is expected and `tsx` works without it (ADR 0006).
+- **`npx --package <tgz>`** installs the package in its own cache (`~/.npm/_npx`); `verify-pack.ts`'s temporary directory only holds the tarball and serves as `cwd`, which is why the output says "temporary directory" and not "installed at". With the network guard in `NODE_OPTIONS`, an npm request fails with `NO_NETWORK` and npm falls back to the cache: locally `test:pack` passed without the network. In CI the cache starts cold and the `pack` job uses the network.
 - **`gpt-tokenizer` 4.0.0:** `import { encode } from 'gpt-tokenizer/encoding/o200k_base'`, offline.
-- **Comparativo:** o `tools/list` real das ações de negócio também traz `outputSchema` e `annotations`. A tabela mede os três campos comuns às duas variantes (`name`, `description`, `inputSchema`) e uma linha abaixo dela dá o total com os campos extras. Com o seed de 30 clientes, só 3 casam com o filtro do C2, então C2b custa quase o mesmo que C2a aqui.
-- **Verificação manual no VS Code (critério do M7): pendente.** O VS Code não está instalado na máquina onde o projeto foi construído, e configurar Cursor ou Claude Desktop no lugar mudaria configuração persistente do usuário e exigiria colar um token real. Roteiro para o dono: `npm run api`; `npm run tokens -- issue --name vscode --role member`; abrir a pasta no VS Code; iniciar `secure-legacy-mcp` pelo `.vscode/mcp.json`; colar o token no prompt de senha; num chat novo, pedir "procure o cliente teodoro". Registrar aqui a data e a versão do VS Code, e ajustar em `docs/clients/README.md` os nomes de comandos que a conferência mostrar diferentes. Enquanto isso, a parte que não depende do editor é automática: `tests/mcp/client-config.e2e.test.ts` sobe o servidor pela entrada do `.vscode/mcp.json`, com `${workspaceFolder}` e o input de senha preenchidos, e confere `tools/list` e `getCustomer`; `tests/repo/client-configs.unit.test.ts` confere o comando (`node`, nunca `npm`), o caminho, o endereço padrão da API e os trechos JSON de `docs/clients/README.md`.
-- **`git` no shell da construção:** no shell interativo usado, `git` era uma função que falhava; os comandos usaram `/usr/bin/git`. O script `hooks:install` roda em `/bin/sh` e acha o `git` normal.
+- **Comparison:** the real `tools/list` of the business actions also carries `outputSchema` and `annotations`. The table measures the three fields common to both variants (`name`, `description`, `inputSchema`) and a line below it gives the total with the extra fields. With the 30-customer seed, only 3 match the C2 filter, so C2b costs almost the same as C2a here.
+- **Manual VS Code check (M7 criterion): pending.** VS Code is not installed on the machine where the project was built, and configuring Cursor or Claude Desktop instead would change persistent user configuration and require pasting a real token. Script for the owner: `npm run api`; `npm run tokens -- issue --name vscode --role member`; open the folder in VS Code; start `secure-legacy-mcp` from `.vscode/mcp.json`; paste the token into the password prompt; in a new chat, ask "find the customer teodoro". Record the date and VS Code version here, and fix in `docs/clients/README.md` any command names the check shows to be different. Meanwhile, the editor-independent part is automatic: `tests/mcp/client-config.e2e.test.ts` starts the server from the `.vscode/mcp.json` entry, with `${workspaceFolder}` and the password input filled in, and checks `tools/list` and `getCustomer`; `tests/repo/client-configs.unit.test.ts` checks the command (`node`, never `npm`), the path, the API's default address and the JSON snippets in `docs/clients/README.md`.
+- **`git` in the construction shell:** in the interactive shell used, `git` was a function that failed; the commands used `/usr/bin/git`. The `hooks:install` script runs in `/bin/sh` and finds the normal `git`.
 
 ## Checklist
 
-| Critério | Teste |
+| Criterion | Test |
 |---|---|
 | PKG-01 | `tests/repo/pack-manifest.unit.test.ts` |
-| PKG-02 | `scripts/verify-pack.ts` (`npm run test:pack`, fora do `npm test`) |
+| PKG-02 | `scripts/verify-pack.ts` (`npm run test:pack`, outside `npm test`) |
 | PKG-03, PKG-04 | `tests/repo/conventions.unit.test.ts` |
 | BEN-01, BEN-02 | `tests/bench/token-table.int.test.ts` |
 | BEN-03 | `tests/bench/mirror-tools.unit.test.ts`, `tests/bench/token-table.int.test.ts`, `tests/legacy-api/openapi-contract.int.test.ts` |
 | REP-01, REP-02 | `tests/repo/conventions.unit.test.ts` |
-| REP-04 | `tests/repo/conventions.unit.test.ts` (arquivo executável), `tests/repo/pre-commit-hook.unit.test.ts` (o hook roda com um `npm` falso e aborta quando o typecheck ou os testes falham) |
+| REP-04 | `tests/repo/conventions.unit.test.ts` (executable file), `tests/repo/pre-commit-hook.unit.test.ts` (the hook runs with a fake `npm` and aborts when the typecheck or the tests fail) |
 | REP-03 | `tests/repo/no-network.unit.test.ts` |
-| Todo ID EARS com teste (CS-3) e cada spec com a lista completa dos seus IDs | `tests/repo/conventions.unit.test.ts` |
-| Ressalvas do comparativo no README e em `docs/token-comparison.md` (arquivo inteiro gerado) | `tests/bench/token-table.int.test.ts` |
-| Seções do README (spec de design 10.1), estrutura dos ADRs, testes citados existem | `tests/repo/docs.unit.test.ts` |
+| Every EARS ID has a test (CS-3) and each spec lists the full set of its IDs | `tests/repo/conventions.unit.test.ts` |
+| Comparison caveats in the README and in `docs/token-comparison.md` (whole file generated) | `tests/bench/token-table.int.test.ts` |
+| README sections (design spec 10.1), ADR structure, cited tests exist | `tests/repo/docs.unit.test.ts` |

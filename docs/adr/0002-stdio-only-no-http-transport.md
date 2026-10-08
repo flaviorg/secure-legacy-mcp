@@ -1,29 +1,29 @@
-# ADR 0002: Só stdio, sem transporte HTTP
+# ADR 0002: stdio only, no HTTP transport
 
-- **Status:** aceito (2026-10-04)
+- **Status:** accepted (2026-10-04)
 
-## Contexto
+## Context
 
-O SDK 1.32 oferece três transportes: stdio, Streamable HTTP e SSE. O servidor roda na máquina de quem usa o editor ou o agente, ao lado da API legada local. A aula 203492 compara os transportes; stdio é também o transporte de um servidor distribuído como pacote npm e iniciado pelo próprio cliente.
+SDK 1.32 offers three transports: stdio, Streamable HTTP and SSE. The server runs on the machine of whoever uses the editor or the agent, next to the local legacy API. Lesson 203492 compares the transports; stdio is also the transport of a server distributed as an npm package and started by the client itself.
 
-| Transporte | Onde roda | Autenticação do cliente MCP | Situação no SDK 1.32 |
+| Transport | Where it runs | MCP client authentication | Status in SDK 1.32 |
 |---|---|---|---|
-| stdio | processo filho do cliente, na mesma máquina | não há rede; o processo herda só o `env` que o cliente passa | suportado |
-| Streamable HTTP | serviço remoto, várias sessões | a especificação de autorização do MCP pede o servidor como resource server OAuth 2.1 | suportado, transporte atual para remoto |
-| SSE | serviço remoto | idem | legado, mantido por compatibilidade |
+| stdio | child process of the client, same machine | no network; the process inherits only the `env` the client passes | supported |
+| Streamable HTTP | remote service, several sessions | the MCP authorization spec asks for the server to be an OAuth 2.1 resource server | supported, the current transport for remote |
+| SSE | remote service | same | legacy, kept for compatibility |
 
-## Decisão
+## Decision
 
-Só stdio. O servidor recebe um `SERVICE_TOKEN` por variável de ambiente e o usa para falar com a API, que é a autoridade de autenticação, papel e limite. Nada de porta aberta pelo MCP.
+stdio only. The server receives a `SERVICE_TOKEN` through an environment variable and uses it to talk to the API, which is the authority for authentication, role and rate limit. No port opened by the MCP server.
 
-## Consequências
+## Consequences
 
-- A segurança é demonstrada onde ela mora: na API (tokens com hash, RBAC, dois baldes de limite).
-- Um token por processo: o demo sobe um processo MCP por token; cada editor configura o seu.
-- Disciplina do stdout vira requisito testado: stdout é o canal JSON-RPC, log vai para stderr (MCP-02, MCP-03).
-- Uso remoto, multiusuário, não é atendido. Se for pedido, vira um spec novo.
+- Security is demonstrated where it lives: in the API (hashed tokens, RBAC, two rate-limit buckets).
+- One token per process: the demo starts one MCP process per token; each editor configures its own.
+- stdout discipline becomes a tested requirement: stdout is the JSON-RPC channel, logs go to stderr (MCP-02, MCP-03).
+- Remote, multi-user use is not served. If requested, it becomes a new spec.
 
-## Alternativas
+## Alternatives
 
-- **Streamable HTTP aceitando o Service Token no MCP e repassando à API:** é o anti-padrão *token passthrough* da leitura *Security Best Practices* indicada em 203470: o MCP aceitaria um token que não foi emitido para ele e perderia a fronteira de auditoria. Fazer direito exige OAuth 2.1 com o MCP como resource server, escopo novo para este projeto.
-- **SSE:** mesmo problema de autenticação, e é o transporte legado.
+- **Streamable HTTP accepting the Service Token at the MCP server and forwarding it to the API:** this is the *token passthrough* anti-pattern from the *Security Best Practices* reading suggested in 203470: the MCP server would accept a token that was not issued for it and lose the audit boundary. Doing it right requires OAuth 2.1 with the MCP server as a resource server, a new scope for this project.
+- **SSE:** the same authentication problem, and it is the legacy transport.

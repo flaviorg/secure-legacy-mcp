@@ -312,7 +312,7 @@ Tokenizer: `o200k_base` (gpt-tokenizer) | estimate: characters/4
 |---|---:|---:|---:|
 | REST mirror (generated from OpenAPI) | 7 | 859 | 796 |
 | Business actions | 5 | 956 | 967 |
-| Whole OpenAPI spec in the prompt | - | 2313 | 2227 |
+| Whole OpenAPI spec in the prompt | - | 2312 | 2227 |
 
 The business action definitions cost 11% more tokens than the mirror's. With `outputSchema` and `annotations`, which the real `tools/list` also returns, the business actions add up to 2471 tokens (o200k); the generated mirror has no output schema.
 

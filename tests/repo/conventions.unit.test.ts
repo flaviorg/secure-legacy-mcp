@@ -98,7 +98,7 @@ test('[REP-01] AGENTS.md has at most 100 lines', () => {
 test('AGENTS.md names the commands and the bench:tokens rule (spec 9.1)', () => {
   const text = readRepoFile('AGENTS.md');
   for (const command of ['npm test', 'npm run typecheck', 'npm run demo', 'npm run bench:tokens', 'npm run test:pack']) assert.ok(text.includes(command), command);
-  assert.match(text, /schema de tool: rode `npm run bench:tokens` antes do commit/);
+  assert.match(text, /schema: run `npm run bench:tokens` before committing/);
 });
 
 test('[REP-02] .env.example lists every variable read by the config schemas', async () => {
