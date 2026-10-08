@@ -10,7 +10,7 @@ import { ConfigError } from '../../src/shared/config-error.ts';
 const exampleFixture = (name: string) => loadFixture(fileURLToPath(new URL(`../../examples/agent/fixtures/${name}.json`, import.meta.url)));
 const fixture = exampleFixture('create-then-ask-id');
 const toolResult = JSON.stringify({ customer: { id: 31, name: 'Ana Souza' } });
-const turn1 = 'crie um cliente chamado ana souza, e-mail ana.souza@example.com, telefone 11 98888-7777, segmento smb';
+const turn1 = 'create a customer named ana souza, email ana.souza@example.com, phone 11 98888-7777, segment smb';
 const turn1Messages = () => [
   new HumanMessage(turn1),
   new AIMessage({ content: '', tool_calls: [{ id: 'c1', name: 'createCustomer', args: {} }] }),
@@ -21,7 +21,7 @@ test('[AGT-03] unknown input raises FakeScriptMissError with the normalized key 
   const r = routeScriptedTurn(fixture, [new HumanMessage('  Algo   Novo ')]);
   assert.ok(r instanceof FakeScriptMissError);
   assert.match(r.message, /"algo novo"/);
-  assert.match(r.message, /qual é o id dele\?/);
+  assert.match(r.message, /what is her id\?/);
 });
 
 test('emits the scripted tool calls on the first step of a turn', () => {
@@ -32,19 +32,19 @@ test('emits the scripted tool calls on the first step of a turn', () => {
 });
 
 test('resolves {{tool:X.path}} from the current turn, with string or block content', () => {
-  assert.equal((routeScriptedTurn(fixture, turn1Messages()) as AIMessage).content, 'Cliente Ana Souza cadastrado com id 31.');
+  assert.equal((routeScriptedTurn(fixture, turn1Messages()) as AIMessage).content, 'Customer Ana Souza registered with id 31.');
   const blocks = turn1Messages(); blocks[2] = new ToolMessage({ tool_call_id: 'c1', content: [{ type: 'text', text: toolResult }] });
-  assert.equal((routeScriptedTurn(fixture, blocks) as AIMessage).content, 'Cliente Ana Souza cadastrado com id 31.');
+  assert.equal((routeScriptedTurn(fixture, blocks) as AIMessage).content, 'Customer Ana Souza registered with id 31.');
 });
 
 test('[AGT-01] resolves {{history:X.path}} across turns', () => {
-  const msgs = [...turn1Messages(), new AIMessage('Cliente Ana Souza cadastrado com id 31.'), new HumanMessage('Qual é o id dele?')];
-  assert.equal((routeScriptedTurn(fixture, msgs) as AIMessage).content, 'O id de Ana Souza é 31.');
+  const msgs = [...turn1Messages(), new AIMessage('Customer Ana Souza registered with id 31.'), new HumanMessage('What is her id?')];
+  assert.equal((routeScriptedTurn(fixture, msgs) as AIMessage).content, 'The id of Ana Souza is 31.');
 });
 
 test('[AGT-02] without history the second turn answers the ifUnresolved text', () => {
-  assert.equal((routeScriptedTurn(fixture, [new HumanMessage('qual é o id dele?')]) as AIMessage).content,
-    'Não sei a qual cliente você se refere. Pode me dizer o nome ou o e-mail?');
+  assert.equal((routeScriptedTurn(fixture, [new HumanMessage('what is her id?')]) as AIMessage).content,
+    'I do not know which customer you mean. Can you tell me the name or the email?');
 });
 
 test('exposes error ToolMessages through {{error:X}}', () => {
@@ -102,7 +102,7 @@ test('[AGT-03] an unresolved placeholder without ifUnresolved, or a step past th
   const unresolved = routeScriptedTurn(f, ok);
   assert.ok(unresolved instanceof FakeScriptMissError);
   assert.match(unresolved.message, /error:createCustomer/);
-  const past = routeScriptedTurn(fixture, [...turn1Messages(), new AIMessage('Cliente Ana Souza cadastrado com id 31.')]);
+  const past = routeScriptedTurn(fixture, [...turn1Messages(), new AIMessage('Customer Ana Souza registered with id 31.')]);
   assert.ok(past instanceof FakeScriptMissError);
   assert.match(past.message, /step 3/);
 });

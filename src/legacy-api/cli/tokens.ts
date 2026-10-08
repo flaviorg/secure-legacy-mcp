@@ -11,10 +11,10 @@ import type { Role, TokenRecord } from '../auth/token-store.ts';
 import { openDatabase } from '../db/database.ts';
 
 const DEFAULT_DATABASE_PATH = './data/legacy.db';
-const USAGE = `Uso:
-  npm run tokens -- issue --name <rótulo> --role member|admin [--expires-in <n>d|<n>h] [--db <caminho>]
-  npm run tokens -- list [--json] [--db <caminho>]
-  npm run tokens -- revoke <id> [--db <caminho>]`;
+const USAGE = `Usage:
+  npm run tokens -- issue --name <label> --role member|admin [--expires-in <n>d|<n>h] [--db <path>]
+  npm run tokens -- list [--json] [--db <path>]
+  npm run tokens -- revoke <id> [--db <path>]`;
 
 const OPTIONS = {
   name: { type: 'string' },
@@ -81,14 +81,14 @@ function parseCommand(argv: string[], now: Date): Command | null {
 const day = (iso: string | null, empty: string) => (iso === null ? empty : iso.slice(0, 10));
 
 function statusOf(record: TokenRecord, now: Date): string {
-  if (record.revokedAt !== null) return 'revogado';
-  if (record.expiresAt !== null && Date.parse(record.expiresAt) <= now.getTime()) return 'expirado';
-  return 'ativo';
+  if (record.revokedAt !== null) return 'revoked';
+  if (record.expiresAt !== null && Date.parse(record.expiresAt) <= now.getTime()) return 'expired';
+  return 'active';
 }
 
 function formatTable(records: TokenRecord[], now: Date): string {
-  const header = ['ID', 'NOME', 'PAPEL', 'CRIADO', 'ÚLTIMO USO', 'EXPIRA', 'STATUS'];
-  const rows = records.map((r) => [r.id, r.name, r.role, day(r.createdAt, '-'), day(r.lastUsedAt, '-'), day(r.expiresAt, 'nunca'), statusOf(r, now)]);
+  const header = ['ID', 'NAME', 'ROLE', 'CREATED', 'LAST USED', 'EXPIRES', 'STATUS'];
+  const rows = records.map((r) => [r.id, r.name, r.role, day(r.createdAt, '-'), day(r.lastUsedAt, '-'), day(r.expiresAt, 'never'), statusOf(r, now)]);
   const widths = header.map((h, i) => Math.max(h.length, ...rows.map((row) => row[i]!.length)));
   return [header, ...rows].map((cells) => cells.map((c, i) => (i === cells.length - 1 ? c : c.padEnd(widths[i]!))).join('  ')).join('\n');
 }
@@ -111,18 +111,18 @@ function runTokensCli(argv: string[], env: Record<string, string | undefined>, i
         case 'issue': {
           const { token, record } = store.issue({ name: cmd.name, role: cmd.role, ...(cmd.expiresAt ? { expiresAt: cmd.expiresAt } : {}) });
           io.out([
-            'Token emitido. Copie agora: ele não será exibido novamente.',
+            'Token issued. Copy it now: it will not be shown again.',
             '',
             `  ${token}`,
             '',
-            `  id: ${record.id} | nome: ${record.name} | papel: ${record.role} | expira: ${day(record.expiresAt, 'nunca')}`,
+            `  id: ${record.id} | name: ${record.name} | role: ${record.role} | expires: ${day(record.expiresAt, 'never')}`,
           ].join('\n'));
           return 0;
         }
         case 'list': {
           const records = store.list();
           if (cmd.json) io.out(JSON.stringify(records, null, 2));
-          else io.out(records.length === 0 ? 'Nenhum token emitido.' : formatTable(records, clock.now()));
+          else io.out(records.length === 0 ? 'No tokens issued.' : formatTable(records, clock.now()));
           return 0;
         }
         case 'revoke': {
@@ -131,10 +131,10 @@ function runTokensCli(argv: string[], env: Record<string, string | undefined>, i
           const id = tokenIdOf(cmd.id) ?? cmd.id;
           const outcome = store.revoke(id);
           if (outcome === 'not_found') {
-            io.err(`Token ${maskTokens(id)} não encontrado.`);
+            io.err(`Token ${maskTokens(id)} not found.`);
             return 2;
           }
-          io.out(outcome === 'revoked' ? `Token ${id} revogado.` : `Token ${id} já estava revogado.`);
+          io.out(outcome === 'revoked' ? `Token ${id} revoked.` : `Token ${id} was already revoked.`);
           return 0;
         }
       }
@@ -142,7 +142,7 @@ function runTokensCli(argv: string[], env: Record<string, string | undefined>, i
       db.close();
     }
   } catch (err) {
-    io.err(`Erro: ${maskTokens((err as Error).message)}`);
+    io.err(`Error: ${maskTokens((err as Error).message)}`);
     return 1;
   }
 }

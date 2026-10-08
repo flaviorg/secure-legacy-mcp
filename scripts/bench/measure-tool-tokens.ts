@@ -20,6 +20,6 @@ if (import.meta.main) {
   process.stdout.write(report);
   if (process.argv.includes('--write')) {
     writeBenchOutputs(report);
-    process.stdout.write('\ndocs/token-comparison.md e README.md atualizados.\n');
+    process.stdout.write('\ndocs/token-comparison.md and README.md updated.\n');
   }
 }

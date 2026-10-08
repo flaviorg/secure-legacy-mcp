@@ -1,9 +1,9 @@
 {
   "scenario": "failed-turn-memory",
-  "description": "Só teste: um turno que estoura o teto no meio da conversa não fica na memória da thread.",
+  "description": "Test only: a turn that exceeds the ceiling mid-conversation is not kept in the thread memory.",
   "turns": [
     {
-      "match": "crie um cliente chamado ana souza, e-mail ana.souza@example.com, telefone 11 98888-7777, segmento smb",
+      "match": "create a customer named ana souza, email ana.souza@example.com, phone 11 98888-7777, segment smb",
       "steps": [
         {
           "toolCalls": [
@@ -19,12 +19,12 @@
           ]
         },
         {
-          "final": "Cliente {{tool:createCustomer.customer.name}} cadastrado com id {{tool:createCustomer.customer.id}}."
+          "final": "Customer {{tool:createCustomer.customer.name}} registered with id {{tool:createCustomer.customer.id}}."
         }
       ]
     },
     {
-      "match": "liste todos os clientes",
+      "match": "list all customers",
       "steps": [
         {
           "toolCalls": [
@@ -109,7 +109,7 @@
       ]
     },
     {
-      "match": "desative o cliente teodoro",
+      "match": "deactivate customer teodoro",
       "steps": [
         {
           "toolCalls": [
@@ -132,16 +132,16 @@
           ]
         },
         {
-          "final": "Cliente {{tool:deactivateCustomer.customer.name}} (id {{tool:deactivateCustomer.customer.id}}) agora está {{tool:deactivateCustomer.customer.status}}."
+          "final": "Customer {{tool:deactivateCustomer.customer.name}} (id {{tool:deactivateCustomer.customer.id}}) is now {{tool:deactivateCustomer.customer.status}}."
         }
       ]
     },
     {
-      "match": "qual é o id dele?",
+      "match": "what is her id?",
       "steps": [
         {
-          "final": "O id de {{history:createCustomer.customer.name}} é {{history:createCustomer.customer.id}}.",
-          "ifUnresolved": "Não sei a qual cliente você se refere. Pode me dizer o nome ou o e-mail?"
+          "final": "The id of {{history:createCustomer.customer.name}} is {{history:createCustomer.customer.id}}.",
+          "ifUnresolved": "I do not know which customer you mean. Can you tell me the name or the email?"
         }
       ]
     }

@@ -15,7 +15,7 @@ Sem chave e sem `.env`, o demo usa o modelo fake roteirizado. Para cada execuç�
 | `config.ts` | `loadAgentConfig(env)`: `fake` por padrão; `openrouter` quando há `OPENROUTER_API_KEY` e `LLM_PROVIDER` não foi definido; `openrouter` sem chave falha cedo. Único arquivo de `examples/` que lê `process.env` |
 | `agent.ts` | `connectCustomersMcp` (servidor `customers` via stdio, `env` explícito, nomes de tool sem prefixo), `createCustomerAgent` (`createAgent` + `MemorySaver` opcional + tetos por turno) e `ask` (um turno; se ele falha, a thread volta ao estado de antes dele) |
 | `model.ts` | `createChatModel`: fake, ou `ChatOpenAI` apontando para `https://openrouter.ai/api/v1` |
-| `prompts/v1/system.ts` | Prompt de sistema versionado: dados só por tools, nunca adivinhar id, resolver antes de escrever, parar diante de `ambiguous`, repassar `[CODIGO]`, responder em português |
+| `prompts/v1/system.ts` | Prompt de sistema versionado: dados só por tools, nunca adivinhar id, resolver antes de escrever, parar diante de `ambiguous`, repassar `[CODIGO]`, responder em inglês |
 | `fake/scripted-router.ts` | Função pura `(fixture, mensagens) -> AIMessage`: escolhe o passo pela última mensagem do usuário e resolve `{{tool:X.caminho}}`, `{{history:X.caminho}}` e `{{error:X}}` nos resultados reais das tools |
 | `fake/scripted-chat-model.ts` | `BaseChatModel` fino sobre o router |
 | `fixtures/*.json` | Um roteiro por cenário: `create-then-ask-id`, `deactivate-teodoro`, `ambiguous-maria`, `member-forbidden` |

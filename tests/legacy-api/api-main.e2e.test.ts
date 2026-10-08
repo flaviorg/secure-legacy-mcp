@@ -60,7 +60,7 @@ test('the API on a port already in use exits 1 with one short line, without a st
   const r = await runApi({ PORT: String(port) });
   assert.equal(r.code, 1);
   assert.equal(r.stdout, '');
-  assert.equal(r.stderr, `porta ${port} em uso em 127.0.0.1; escolha outra com PORT\n`);
+  assert.equal(r.stderr, `port ${port} in use on 127.0.0.1; pick another one with PORT\n`);
 });
 
 test('the API with an invalid variable exits 1 naming it, without echoing the value', async () => {

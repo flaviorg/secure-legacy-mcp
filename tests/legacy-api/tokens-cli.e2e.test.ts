@@ -19,7 +19,7 @@ const CLI = fileURLToPath(new URL('../../src/legacy-api/cli/tokens.ts', import.m
 const run = (args: string[]) => execFileP(process.execPath, [CLI, ...args], { env: { PATH: process.env.PATH } })
   .then((r) => ({ code: 0, ...r }), (e) => ({ code: e.code as number, stdout: e.stdout as string, stderr: e.stderr as string }));
 const tokensIn = (text: string) => text.match(/slm_[a-z0-9]{8}_[A-Za-z0-9_-]{43}/g) ?? [];
-const HEADER = /^ID\s+NOME\s+PAPEL\s+CRIADO\s+ÚLTIMO USO\s+EXPIRA\s+STATUS$/m;
+const HEADER = /^ID\s+NAME\s+ROLE\s+CREATED\s+LAST USED\s+EXPIRES\s+STATUS$/m;
 
 async function withDb(t: TestContext) {
   const dir = mkdtempSync(join(tmpdir(), 'slm-cli-')); t.after(() => rmSync(dir, { recursive: true, force: true }));
@@ -30,9 +30,9 @@ test('[SEC-01] issue prints the token once with the copy-now warning', async (t)
   const db = await withDb(t);
   const r = await run(['issue', '--name', 'vscode', '--role', 'member', '--expires-in', '30d', '--db', db]);
   assert.equal(r.code, 0);
-  assert.match(r.stdout, /Copie agora/);
+  assert.match(r.stdout, /Copy it now/);
   assert.equal(tokensIn(r.stdout).length, 1);
-  assert.match(r.stdout, /id: [a-z0-9]{8} \| nome: vscode \| papel: member \| expira: \d{4}-\d{2}-\d{2}/);
+  assert.match(r.stdout, /id: [a-z0-9]{8} \| name: vscode \| role: member \| expires: \d{4}-\d{2}-\d{2}/);
   assert.equal((await run(['issue', '--name', 'x', '--role', 'root', '--db', db])).code, 1);
 });
 
@@ -85,31 +85,31 @@ test('[SEC-08] revoke never echoes a token pasted with a missing or an extra cha
   for (const pasted of [token.slice(0, -1), `${token}x`]) {
     const r = await run(['revoke', pasted, '--db', db]);
     assert.equal(r.code, 2);
-    assert.equal(r.stderr.trim(), `Token slm_${id}_*** não encontrado.`);
+    assert.equal(r.stderr.trim(), `Token slm_${id}_*** not found.`);
     assert.ok(!r.stderr.includes(secret.slice(0, 8)) && !r.stdout.includes(secret.slice(0, 8)));
   }
 });
 
-test('list shows dates, "-" for never used, "nunca" without expiry and the ativo, revogado and expirado statuses', async (t) => {
+test('list shows dates, "-" for never used, "never" without expiry and the active, revoked and expired statuses', async (t) => {
   const db = await withDb(t);
   const before = new Date().toISOString().slice(0, 10);
-  const active = tokenIdOf(tokensIn((await run(['issue', '--name', 'ativo-1', '--role', 'member', '--expires-in', '12h', '--db', db])).stdout)[0]!)!;
-  const revoked = tokenIdOf(tokensIn((await run(['issue', '--name', 'revogado-1', '--role', 'admin', '--db', db])).stdout)[0]!)!;
+  const active = tokenIdOf(tokensIn((await run(['issue', '--name', 'active-1', '--role', 'member', '--expires-in', '12h', '--db', db])).stdout)[0]!)!;
+  const revoked = tokenIdOf(tokensIn((await run(['issue', '--name', 'revoked-1', '--role', 'admin', '--db', db])).stdout)[0]!)!;
   assert.equal((await run(['revoke', revoked, '--db', db])).code, 0);
   const handle = openDatabase(db);
   const expired = createTokenStore(handle, fixedClock('2020-01-01T00:00:00.000Z'))
-    .issue({ name: 'expirado-1', role: 'member', expiresAt: new Date('2020-01-02T00:00:00.000Z') }).record.id;
+    .issue({ name: 'expired-1', role: 'member', expiresAt: new Date('2020-01-02T00:00:00.000Z') }).record.id;
   handle.close();
   const rows = (await run(['list', '--db', db])).stdout.split('\n');
   const row = (id: string) => rows.find((line) => line.startsWith(id))!.trim().split(/\s{2,}/);
   const after = new Date().toISOString().slice(0, 10);
-  assert.deepEqual(row(active).slice(1, 3), ['ativo-1', 'member']);
+  assert.deepEqual(row(active).slice(1, 3), ['active-1', 'member']);
   assert.ok([before, after].includes(row(active)[3]!), 'created today');
   assert.equal(row(active)[4], '-');
   assert.match(row(active)[5]!, /^\d{4}-\d{2}-\d{2}$/);
-  assert.equal(row(active)[6], 'ativo');
-  assert.deepEqual(row(revoked).slice(5), ['nunca', 'revogado']);
-  assert.deepEqual(row(expired).slice(3), ['2020-01-01', '-', '2020-01-02', 'expirado']);
+  assert.equal(row(active)[6], 'active');
+  assert.deepEqual(row(revoked).slice(5), ['never', 'revoked']);
+  assert.deepEqual(row(expired).slice(3), ['2020-01-01', '-', '2020-01-02', 'expired']);
 });
 
 test('revoke is idempotent: a second revoke exits 0 and says it was already revoked', async (t) => {
@@ -117,10 +117,10 @@ test('revoke is idempotent: a second revoke exits 0 and says it was already revo
   const id = tokenIdOf(tokensIn((await run(['issue', '--name', 'twice', '--role', 'member', '--db', db])).stdout)[0]!)!;
   const first = await run(['revoke', id, '--db', db]);
   assert.equal(first.code, 0);
-  assert.match(first.stdout, new RegExp(`^Token ${id} revogado\\.$`, 'm'));
+  assert.match(first.stdout, new RegExp(`^Token ${id} revoked\\.$`, 'm'));
   const second = await run(['revoke', id, '--db', db]);
   assert.equal(second.code, 0);
-  assert.match(second.stdout, new RegExp(`^Token ${id} já estava revogado\\.$`, 'm'));
+  assert.match(second.stdout, new RegExp(`^Token ${id} was already revoked\\.$`, 'm'));
 });
 
 test('invalid usage prints the usage on stderr and exits with code 1', async (t) => {
@@ -134,7 +134,7 @@ test('invalid usage prints the usage on stderr and exits with code 1', async (t)
   for (const args of invalid) {
     const r = await run(args);
     assert.equal(r.code, 1, args.join(' '));
-    assert.match(r.stderr, /Uso:/, args.join(' '));
+    assert.match(r.stderr, /Usage:/, args.join(' '));
     assert.equal(r.stdout, '', args.join(' '));
   }
   assert.deepEqual(JSON.parse((await run(['list', '--json', '--db', db])).stdout), []);

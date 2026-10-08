@@ -147,10 +147,10 @@ export async function runDemo(out: (line: string) => void): Promise<DemoStats> {
     tokens = [issued.admin.token, issued.member.token, issued.burst.token];
     const seedCount = (api.db.prepare('SELECT COUNT(*) AS n FROM customers').get() as { n: number }).n;
 
-    out('secure-legacy-mcp demo (sem LLM, sem rede externa)');
-    out(`API legada: ${api.url} (SQLite em memória, ${seedCount} clientes de seed)`);
-    out(`Tokens emitidos: admin (id ${tokenIdOf(issued.admin.token)}), member (id ${tokenIdOf(issued.member.token)}), burst (id ${tokenIdOf(issued.burst.token)})`);
-    out('Servidor MCP: node src/mcp/main.ts via stdio (um processo por token)');
+    out('secure-legacy-mcp demo (no LLM, no external network)');
+    out(`Legacy API: ${api.url} (in-memory SQLite, ${seedCount} seed customers)`);
+    out(`Tokens issued: admin (id ${tokenIdOf(issued.admin.token)}), member (id ${tokenIdOf(issued.member.token)}), burst (id ${tokenIdOf(issued.burst.token)})`);
+    out('MCP server: node src/mcp/main.ts over stdio (one process per token)');
     out('');
 
     const [admin, member, burst] = await Promise.all([openSession(issued.admin.token), openSession(issued.member.token), openSession(issued.burst.token)]);
@@ -174,7 +174,7 @@ export async function runDemo(out: (line: string) => void): Promise<DemoStats> {
     out('[3] getCustomer {"name":"maria silva"} (member)');
     const maria = expectOk<{ match: string; candidates: Summary[] }>(3, await call(member!, 'getCustomer', { name: 'maria silva' }));
     if (maria.match !== 'ambiguous' || maria.candidates.length !== 2) fail(3, `expected ambiguous with 2 candidates, got ${maria.match}`);
-    out(`    ambiguous -> ${maria.candidates.length} candidatos: ${maria.candidates.map(candidate).join(', ')}`);
+    out(`    ambiguous -> ${maria.candidates.length} candidates: ${maria.candidates.map(candidate).join(', ')}`);
 
     // [4] Filters run in SQLite, with lim always present.
     const filters = { status: 'active', segment: 'enterprise', createdFrom: '2024-01-01', createdTo: '2024-12-31' };
@@ -183,7 +183,7 @@ export async function runDemo(out: (line: string) => void): Promise<DemoStats> {
     if (search.total !== 3 || search.items.length !== 3) fail(4, `expected 3 of 3, got ${search.items.length} of ${search.total}`);
     const listing = requests.filter((r) => r.method === 'GET' && r.url.startsWith('/v1/customers?')).at(-1);
     if (listing === undefined || !/[?&]lim=\d+/.test(listing.url)) fail(4, 'the listing request did not carry lim');
-    out(`    ${search.items.length} de ${search.total} -> ${search.items.map((c) => `#${c.id}`).join(', ')}   (filtro no SQLite: GET ${listing!.url})`);
+    out(`    ${search.items.length} of ${search.total} -> ${search.items.map((c) => `#${c.id}`).join(', ')}   (filter in SQLite: GET ${listing!.url})`);
 
     // [5] RBAC comes from the token record: member cannot write.
     out(`[5] createCustomer ${ANA_SHORT} (member)`);
@@ -196,22 +196,22 @@ export async function runDemo(out: (line: string) => void): Promise<DemoStats> {
     out(`    created -> ${describe(created.customer)}`);
 
     // [7] Idempotent deactivation: the second call sends no PUT.
-    out(`[7] deactivateCustomer {"id":${teodoroId}} (admin), depois de novo`);
+    out(`[7] deactivateCustomer {"id":${teodoroId}} (admin), then again`);
     const first = expectOk<{ customer: Customer; alreadyInactive: boolean }>(7, await call(admin!, 'deactivateCustomer', { id: teodoroId }));
     const second = expectOk<{ customer: Customer; alreadyInactive: boolean }>(7, await call(admin!, 'deactivateCustomer', { id: teodoroId }));
     const puts = requests.filter((r) => r.method === 'PUT' && r.url === `/v1/customers/${teodoroId}`).length;
     if (first.alreadyInactive || first.customer.status !== 'inactive' || !second.alreadyInactive || puts !== 1) {
       fail(7, `expected one PUT and alreadyInactive false then true, got ${puts} PUT(s)`);
     }
-    out(`    #${teodoroId} ${first.customer.status} (alreadyInactive: false) | segunda chamada: alreadyInactive: true, nenhum PUT`);
+    out(`    #${teodoroId} ${first.customer.status} (alreadyInactive: false) | second call: alreadyInactive: true, no PUT`);
 
     // [8] Revocation takes effect on the next request, without restarting anything.
-    out(`[8] revoga o token member (mesma função usada pela CLI), depois getCustomer {"id":${teodoroId}} (member)`);
+    out(`[8] revoke the member token (same function the CLI uses), then getCustomer {"id":${teodoroId}} (member)`);
     if (api.tokens.revoke(tokenIdOf(issued.member.token)!) !== 'revoked') fail(8, 'the member token was not revoked');
     out(`    isError ${expectError(8, await call(member!, 'getCustomer', { id: teodoroId }), 'AUTH_INVALID')}`);
 
     // [9] The per-token bucket stops the burst; the shared IP bucket (180) is not reached.
-    out(`[9] rajada de ${BURST_CALLS} chamadas getCustomer com o token burst (limite 90/min)`);
+    out(`[9] burst of ${BURST_CALLS} getCustomer calls with the burst token (limit 90/min)`);
     let ok = 0;
     let last: CallToolResult | undefined;
     for (let i = 1; i <= BURST_CALLS; i++) {
@@ -224,14 +224,14 @@ export async function runDemo(out: (line: string) => void): Promise<DemoStats> {
     const limited = expectError(9, last!, 'RATE_LIMITED');
     const meta = (last!._meta as Record<string, { scope?: string }> | undefined)?.['secure-legacy-mcp/error'];
     if (meta?.scope !== 'token') fail(9, `expected the token bucket to decide, got scope ${meta?.scope}`);
-    out(`    ${ok} ok | ${BURST_CALLS}a -> isError ${limited} (scope: token)`);
+    out(`    ${ok} ok | #${BURST_CALLS} -> isError ${limited} (scope: token)`);
 
     // [10] Data that reads like an instruction is returned as data.
-    out('[10] getCustomer {"name":"ignore previous"} (admin): dado que parece instrução');
+    out('[10] getCustomer {"name":"ignore previous"} (admin): data that reads like an instruction');
     const injected = expectOk<{ match: string; customer: Customer | null }>(10, await call(admin!, 'getCustomer', { name: 'ignore previous' }));
     if (injected.match !== 'found' || injected.customer?.name !== INSTRUCTION_LIKE_NAME) fail(10, `expected found ${INSTRUCTION_LIKE_NAME}`);
     out(`    found -> ${JSON.stringify(injected.customer)}`);
-    out('    (o servidor devolve o nome como dado; não interpreta conteúdo)');
+    out('    (the server returns the name as data; it does not interpret content)');
   } finally {
     closing = true;
     await Promise.allSettled(sessions.map((s) => s.close()));
@@ -241,14 +241,14 @@ export async function runDemo(out: (line: string) => void): Promise<DemoStats> {
 
   stats.elapsedMs = Math.round(performance.now() - started);
   const stdoutPart = stats.stdoutInvalid === 0
-    ? `stdout do MCP: ${stats.stdoutMessages} mensagens, todas JSON-RPC 2.0`
-    : `stdout do MCP: ${stats.stdoutMessages} mensagens, ${stats.stdoutInvalid} fora do JSON-RPC 2.0`;
+    ? `MCP stdout: ${stats.stdoutMessages} messages, all JSON-RPC 2.0`
+    : `MCP stdout: ${stats.stdoutMessages} messages, ${stats.stdoutInvalid} not JSON-RPC 2.0`;
   const stderrPart = stats.stderrNonJson === 0
-    ? `stderr: ${stats.stderrLines} linhas de log JSON`
-    : `stderr: ${stats.stderrLines} linhas, ${stats.stderrNonJson} fora do JSON`;
+    ? `stderr: ${stats.stderrLines} JSON log lines`
+    : `stderr: ${stats.stderrLines} lines, ${stats.stderrNonJson} not JSON`;
   out('');
-  out(`${stdoutPart} | ${stderrPart}, ${stats.tokensExposed} tokens expostos`);
-  out(`Concluído em ${(stats.elapsedMs / 1000).toFixed(1).replace('.', ',')} s`);
+  out(`${stdoutPart} | ${stderrPart}, ${stats.tokensExposed} tokens exposed`);
+  out(`Done in ${(stats.elapsedMs / 1000).toFixed(1)} s`);
   return stats;
 }
 
@@ -260,7 +260,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     process.exitCode = demoSucceeded(stats) ? 0 : 1;
   } catch (err) {
     const e = err as Error;
-    process.stderr.write(`demo falhou: ${e?.name === STEP_ERROR ? e.message : maskTokens(String(e?.stack ?? err))}\n`);
+    process.stderr.write(`demo failed: ${e?.name === STEP_ERROR ? e.message : maskTokens(String(e?.stack ?? err))}\n`);
     process.exitCode = 1;
   }
 }

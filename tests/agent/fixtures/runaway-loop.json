@@ -1,9 +1,9 @@
 {
   "scenario": "runaway-loop",
-  "description": "Só teste: o modelo pede searchCustomers sem parar, para provar os tetos do agente.",
+  "description": "Test only: the model keeps asking for searchCustomers, to prove the agent ceilings.",
   "turns": [
     {
-      "match": "liste todos os clientes",
+      "match": "list all customers",
       "steps": [
         {
           "toolCalls": [

@@ -40,9 +40,9 @@ test('countTokens gives the o200k count and the chars/4 estimate', () => {
 
 test('[BEN-03] the report measures 7 mirror tools, 5 business actions and every scenario', async () => {
   const report = await buildTokenReport();
-  assert.match(report, /\| Espelho REST \(gerado do OpenAPI\) \| 7 \| \d+ \| \d+ \|/);
-  assert.match(report, /\| Ações de negócio \| 5 \| \d+ \| \d+ \|/);
-  assert.match(report, /\| Spec OpenAPI inteira no prompt \| - \| \d+ \| \d+ \|/);
+  assert.match(report, /\| REST mirror \(generated from OpenAPI\) \| 7 \| \d+ \| \d+ \|/);
+  assert.match(report, /\| Business actions \| 5 \| \d+ \| \d+ \|/);
+  assert.match(report, /\| Whole OpenAPI spec in the prompt \| - \| \d+ \| \d+ \|/);
   for (const id of ['C1', 'C2a', 'C2b', 'C3']) assert.match(report, new RegExp(`\\| ${id} `), id);
   assert.match(report, /docs\/token-comparison\.md/);
 });
@@ -57,9 +57,9 @@ test('[BEN-02] docs/token-comparison.md carries the methodology and the same gen
 
 // Spec 9.1: the caveats go in the README and in docs/token-comparison.md.
 const CAVEATS: [string, RegExp][] = [
-  ['other models tokenize differently', /Outros modelos tokenizam diferente/],
+  ['other models tokenize differently', /Outros modelos tokenizam diferente|Other models tokenize differently/],
   ['providers reformat the definitions', /provedores (também )?reformatam as definições|providers also reformat the tool definitions/],
-  ['the cost of mirror mistakes is not measured, except C2b', /não\*{0,2} entra na medição/],
+  ['the cost of mirror mistakes is not measured, except C2b', /não\*{0,2} entra na medição|is \*{0,2}not\*{0,2} included in the measurement/],
   ['field helpers (D-25), with the cost of the Zod default in ADR 0001', /D-25[^\n]*docs\/adr\/0001|docs\/adr\/0001[^\n]*D-25/],
 ];
 
@@ -84,10 +84,10 @@ test('the scenarios follow spec 9.1: C2a limits both sides to 10, C2b drops lim,
 });
 
 test('relativeDifference rounds to the nearest percent and names the direction', () => {
-  assert.equal(relativeDifference(956, 859), '11% mais');
-  assert.equal(relativeDifference(1116, 1000), '12% mais');
-  assert.equal(relativeDifference(884, 1000), '12% menos');
-  assert.equal(relativeDifference(5, 5), 'o mesmo número de');
+  assert.equal(relativeDifference(956, 859), '11% more');
+  assert.equal(relativeDifference(1116, 1000), '12% more');
+  assert.equal(relativeDifference(884, 1000), '12% fewer');
+  assert.equal(relativeDifference(5, 5), 'the same number of');
 });
 
 test('[BEN-02] npm run bench:tokens rewrites the README block and the whole docs/token-comparison.md', (t) => {
@@ -96,7 +96,7 @@ test('[BEN-02] npm run bench:tokens rewrites the README block and the whole docs
   const paths = { readme: join(dir, 'README.md'), doc: join(dir, 'token-comparison.md') };
   writeFileSync(paths.readme, 'intro\n<!-- token-table:start -->\nold\n<!-- token-table:end -->\noutro\n');
   writeFileSync(paths.doc, 'stale');
-  const report = 'Tokenizador: x\n\n| a | b |\n';
+  const report = 'Tokenizer: x\n\n| a | b |\n';
   writeBenchOutputs(report, paths);
   assert.equal(readFileSync(paths.readme, 'utf8'), `intro\n<!-- token-table:start -->\n${report.trim()}\n<!-- token-table:end -->\noutro\n`);
   assert.equal(readFileSync(paths.doc, 'utf8'), renderComparisonDoc(report));

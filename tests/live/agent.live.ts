@@ -22,15 +22,15 @@ async function liveAgent(t: TestContext) {
 
 test('[AGT-06] create-then-ask-id with a real model creates the customer and answers its id', { skip, timeout: 120_000 }, async (t) => {
   const { api, agent } = await liveAgent(t);
-  await ask(agent, 'crie um cliente chamado ana souza, e-mail ana.souza@example.com, telefone 11 98888-7777, segmento smb', 'live-1');
+  await ask(agent, 'create a customer named ana souza, email ana.souza@example.com, phone 11 98888-7777, segment smb', 'live-1');
   const row = api.db.prepare('SELECT cst_id FROM customers WHERE cst_eml = ?').get('ana.souza@example.com') as { cst_id: number } | undefined;
   assert.ok(row !== undefined, 'the customer was not created');
-  assert.match(await ask(agent, 'qual é o id dele?', 'live-1'), new RegExp(`\\b${row.cst_id}\\b`));
+  assert.match(await ask(agent, 'what is her id?', 'live-1'), new RegExp(`\\b${row.cst_id}\\b`));
 });
 
 test('[AGT-06] deactivate-teodoro with a real model sets cst_sts to I', { skip, timeout: 120_000 }, async (t) => {
   const { api, agent } = await liveAgent(t);
-  await ask(agent, 'desative o cliente teodoro', 'live-2');
+  await ask(agent, 'deactivate customer teodoro', 'live-2');
   const row = api.db.prepare("SELECT cst_sts FROM customers WHERE cst_nm = 'Teodoro Escarlate'").get() as { cst_sts: string };
   assert.equal(row.cst_sts, 'I');
 });

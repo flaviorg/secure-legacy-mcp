@@ -20,7 +20,7 @@ const EXPECTED_TOOLS = ['createCustomer', 'deactivateCustomer', 'getCustomer', '
 type PackResult = { filename: string; size: number; entryCount: number };
 
 const out = (line: string) => { process.stdout.write(`${line}\n`); };
-const kB = (bytes: number) => (bytes / 1000).toFixed(1).replace('.', ',');
+const kB = (bytes: number) => (bytes / 1000).toFixed(1);
 
 async function verifyPack(): Promise<void> {
   const tmp = mkdtempSync(join(tmpdir(), 'slm-pack-'));
@@ -33,11 +33,11 @@ async function verifyPack(): Promise<void> {
     })) as PackResult[];
     const tarball = packed[0];
     if (tarball === undefined) throw new Error('npm pack produced no tarball');
-    out(`npm pack -> ${tarball.filename} (${tarball.entryCount} arquivos, ${kB(tarball.size)} kB)`);
+    out(`npm pack -> ${tarball.filename} (${tarball.entryCount} files, ${kB(tarball.size)} kB)`);
 
     api = await startLegacyApi();
     const token = api.tokens.issue({ name: 'verify-pack', role: 'admin' }).token;
-    out(`diretório temporário: ${tmp} | API em ${api.url}`);
+    out(`temporary directory: ${tmp} | API at ${api.url}`);
 
     const env: Record<string, string> = {
       PATH: process.env.PATH ?? '',
@@ -63,7 +63,7 @@ async function verifyPack(): Promise<void> {
     out(`npx --package ${tarball.filename} secure-legacy-mcp -> tools/list: ${names.length} tools`);
   } catch (err) {
     const tail = maskTokens(stderr.join('')).split('\n').slice(-20).join('\n');
-    if (tail.trim() !== '') process.stderr.write(`stderr do servidor (fim):\n${tail}\n`);
+    if (tail.trim() !== '') process.stderr.write(`server stderr (tail):\n${tail}\n`);
     throw err;
   } finally {
     await client?.close();
@@ -76,6 +76,6 @@ try {
   await verifyPack();
   out('ok [PKG-02]');
 } catch (err) {
-  process.stderr.write(`falhou [PKG-02]: ${maskTokens(String((err as Error)?.message ?? err))}\n`);
+  process.stderr.write(`failed [PKG-02]: ${maskTokens(String((err as Error)?.message ?? err))}\n`);
   process.exitCode = 1;
 }

@@ -114,9 +114,9 @@ const row = (cells: (string | number)[]) => `| ${cells.join(' | ')} |`;
 
 // How a compares with b, as the report's sentence says it (rounded to the nearest percent).
 export function relativeDifference(a: number, b: number): string {
-  if (a === b) return 'o mesmo número de';
+  if (a === b) return 'the same number of';
   const pct = Math.round((Math.abs(a - b) / b) * 100);
-  return a > b ? `${pct}% mais` : `${pct}% menos`;
+  return a > b ? `${pct}% more` : `${pct}% fewer`;
 }
 
 // Markdown block shared by the README and docs/token-comparison.md.
@@ -132,38 +132,38 @@ export async function buildTokenReport(): Promise<string> {
   const fullList = countTokens(business.fullListText);
 
   const lines = [
-    'Tokenizador: `o200k_base` (gpt-tokenizer) | estimativa: caracteres/4',
+    'Tokenizer: `o200k_base` (gpt-tokenizer) | estimate: characters/4',
     '',
-    '**Definições** (`JSON.stringify` do array `{ name, description, inputSchema }` de um `tools/list`)',
+    '**Definitions** (`JSON.stringify` of the `{ name, description, inputSchema }` array from a `tools/list`)',
     '',
-    row(['Variante', 'Tools', 'Tokens (o200k)', 'Estimativa (chars/4)']),
+    row(['Variant', 'Tools', 'Tokens (o200k)', 'Estimate (chars/4)']),
     '|---|---:|---:|---:|',
-    row(['Espelho REST (gerado do OpenAPI)', mirror.definitions.tools, mirrorDefs.o200k, mirrorDefs.chars4]),
-    row(['Ações de negócio', business.definitions.tools, businessDefs.o200k, businessDefs.chars4]),
-    row(['Spec OpenAPI inteira no prompt', '-', openApiDefs.o200k, openApiDefs.chars4]),
+    row(['REST mirror (generated from OpenAPI)', mirror.definitions.tools, mirrorDefs.o200k, mirrorDefs.chars4]),
+    row(['Business actions', business.definitions.tools, businessDefs.o200k, businessDefs.chars4]),
+    row(['Whole OpenAPI spec in the prompt', '-', openApiDefs.o200k, openApiDefs.chars4]),
     '',
-    `As definições das ações de negócio custam ${relativeDifference(businessDefs.o200k, mirrorDefs.o200k)} tokens que as do espelho. ` +
-      `Com \`outputSchema\` e \`annotations\`, que o \`tools/list\` real também devolve, as ações de negócio somam ${fullList.o200k} tokens (o200k); ` +
-      'o espelho gerado não tem esquema de saída.',
+    `The business action definitions cost ${relativeDifference(businessDefs.o200k, mirrorDefs.o200k)} tokens ${businessDefs.o200k === mirrorDefs.o200k ? 'as' : 'than'} the mirror's. ` +
+      `With \`outputSchema\` and \`annotations\`, which the real \`tools/list\` also returns, the business actions add up to ${fullList.o200k} tokens (o200k); ` +
+      'the generated mirror has no output schema.',
     '',
-    '**Cenários** (sequência mínima correta, sem erros do modelo, contra a API com o seed de 30 clientes)',
+    '**Scenarios** (minimal correct sequence, no model mistakes, against the API with the 30-customer seed)',
     '',
-    row(['Cenário', 'Variante', 'Chamadas', 'Tokens de argumentos', 'Tokens de resultados']),
+    row(['Scenario', 'Variant', 'Calls', 'Argument tokens', 'Result tokens']),
     '|---|---|---:|---:|---:|',
   ];
   for (const s of SCENARIOS) {
     const label = `${s.id} ${s.title}`;
     const m = mirror.scenarios.get(s.id)!;
-    lines.push(row([label, 'Espelho REST', m.calls, m.argTokens, m.resultTokens]));
+    lines.push(row([label, 'REST mirror', m.calls, m.argTokens, m.resultTokens]));
     const b = business.scenarios.get(s.business === null ? 'C2a' : s.id)!;
-    lines.push(row([label, s.business === null ? 'Ações de negócio (mesma chamada de C2a)' : 'Ações de negócio', b.calls, b.argTokens, b.resultTokens]));
+    lines.push(row([label, s.business === null ? 'Business actions (same call as C2a)' : 'Business actions', b.calls, b.argTokens, b.resultTokens]));
   }
   lines.push(
     '',
-    'C2a é a comparação justa: os dois lados limitados a 10 itens. C2b mostra um erro possível do modelo, não um baseline: ' +
-      'sem `lim`, a API legada devolve tudo o que casa com o filtro. O custo dos outros erros do espelho (códigos `A`/`I` e `1`/`2`/`3`, ' +
-      '`cst_id` no corpo do `PUT`) não entra na medição. Outros modelos tokenizam diferente; vale a comparação relativa. ' +
-      'Metodologia e ressalvas: [docs/token-comparison.md](docs/token-comparison.md).',
+    'C2a is the fair comparison: both sides are limited to 10 items. C2b shows a possible model mistake, not a baseline: ' +
+      'without `lim`, the legacy API returns everything that matches the filter. The cost of the mirror\'s other mistakes (the `A`/`I` and `1`/`2`/`3` codes, ' +
+      '`cst_id` in the `PUT` body) is not included in the measurement. Other models tokenize differently; the relative comparison is what matters. ' +
+      'Methodology and caveats: [docs/token-comparison.md](docs/token-comparison.md).',
   );
   return lines.join('\n') + '\n';
 }

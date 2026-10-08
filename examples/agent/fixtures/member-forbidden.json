@@ -1,12 +1,12 @@
 {
   "scenario": "member-forbidden",
-  "description": "Com token member, createCustomer volta como erro [FORBIDDEN] e a resposta final repassa o texto ao usuário.",
+  "description": "With a member token, createCustomer comes back as a [FORBIDDEN] error and the final answer relays the text to the user.",
   "turns": [
     {
-      "match": "cadastre a cliente ana souza, e-mail ana.souza@example.com, telefone 11 98888-7777, segmento smb",
+      "match": "register customer ana souza, email ana.souza@example.com, phone 11 98888-7777, segment smb",
       "steps": [
         { "toolCalls": [ { "name": "createCustomer", "args": { "name": "Ana Souza", "email": "ana.souza@example.com", "phone": "11 98888-7777", "segment": "smb" } } ] },
-        { "final": "Não consegui cadastrar a cliente. O servidor respondeu: {{error:createCustomer}}" }
+        { "final": "I could not register the customer. The server answered: {{error:createCustomer}}" }
       ]
     }
   ]

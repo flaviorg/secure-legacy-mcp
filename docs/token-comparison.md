@@ -35,29 +35,29 @@ O roteiro é a sequência mínima correta, sem LLM e sem erros do modelo (`scrip
 
 ## Resultado
 
-Tokenizador: `o200k_base` (gpt-tokenizer) | estimativa: caracteres/4
+Tokenizer: `o200k_base` (gpt-tokenizer) | estimate: characters/4
 
-**Definições** (`JSON.stringify` do array `{ name, description, inputSchema }` de um `tools/list`)
+**Definitions** (`JSON.stringify` of the `{ name, description, inputSchema }` array from a `tools/list`)
 
-| Variante | Tools | Tokens (o200k) | Estimativa (chars/4) |
+| Variant | Tools | Tokens (o200k) | Estimate (chars/4) |
 |---|---:|---:|---:|
-| Espelho REST (gerado do OpenAPI) | 7 | 859 | 796 |
-| Ações de negócio | 5 | 956 | 967 |
-| Spec OpenAPI inteira no prompt | - | 2313 | 2227 |
+| REST mirror (generated from OpenAPI) | 7 | 859 | 796 |
+| Business actions | 5 | 956 | 967 |
+| Whole OpenAPI spec in the prompt | - | 2313 | 2227 |
 
-As definições das ações de negócio custam 11% mais tokens que as do espelho. Com `outputSchema` e `annotations`, que o `tools/list` real também devolve, as ações de negócio somam 2471 tokens (o200k); o espelho gerado não tem esquema de saída.
+The business action definitions cost 11% more tokens than the mirror's. With `outputSchema` and `annotations`, which the real `tools/list` also returns, the business actions add up to 2471 tokens (o200k); the generated mirror has no output schema.
 
-**Cenários** (sequência mínima correta, sem erros do modelo, contra a API com o seed de 30 clientes)
+**Scenarios** (minimal correct sequence, no model mistakes, against the API with the 30-customer seed)
 
-| Cenário | Variante | Chamadas | Tokens de argumentos | Tokens de resultados |
+| Scenario | Variant | Calls | Argument tokens | Result tokens |
 |---|---|---:|---:|---:|
-| C1 telefone do cliente com e-mail X | Espelho REST | 1 | 13 | 71 |
-| C1 telefone do cliente com e-mail X | Ações de negócio | 1 | 12 | 61 |
-| C2a clientes enterprise ativos cadastrados em 2024 (comparação justa) | Espelho REST | 1 | 28 | 188 |
-| C2a clientes enterprise ativos cadastrados em 2024 (comparação justa) | Ações de negócio | 1 | 29 | 102 |
-| C2b mesmo pedido, espelho ingênuo sem `lim` (erro do modelo) | Espelho REST | 1 | 24 | 188 |
-| C2b mesmo pedido, espelho ingênuo sem `lim` (erro do modelo) | Ações de negócio (mesma chamada de C2a) | 1 | 29 | 102 |
-| C3 desative o Teodoro | Espelho REST | 2 | 58 | 82 |
-| C3 desative o Teodoro | Ações de negócio | 2 | 11 | 119 |
+| C1 customer phone for email X | REST mirror | 1 | 13 | 71 |
+| C1 customer phone for email X | Business actions | 1 | 12 | 61 |
+| C2a active enterprise customers registered in 2024 (fair comparison) | REST mirror | 1 | 28 | 188 |
+| C2a active enterprise customers registered in 2024 (fair comparison) | Business actions | 1 | 29 | 102 |
+| C2b same request, naive mirror without `lim` (model mistake) | REST mirror | 1 | 24 | 188 |
+| C2b same request, naive mirror without `lim` (model mistake) | Business actions (same call as C2a) | 1 | 29 | 102 |
+| C3 deactivate Teodoro | REST mirror | 2 | 58 | 82 |
+| C3 deactivate Teodoro | Business actions | 2 | 11 | 119 |
 
-C2a é a comparação justa: os dois lados limitados a 10 itens. C2b mostra um erro possível do modelo, não um baseline: sem `lim`, a API legada devolve tudo o que casa com o filtro. O custo dos outros erros do espelho (códigos `A`/`I` e `1`/`2`/`3`, `cst_id` no corpo do `PUT`) não entra na medição. Outros modelos tokenizam diferente; vale a comparação relativa. Metodologia e ressalvas: [docs/token-comparison.md](docs/token-comparison.md).
+C2a is the fair comparison: both sides are limited to 10 items. C2b shows a possible model mistake, not a baseline: without `lim`, the legacy API returns everything that matches the filter. The cost of the mirror's other mistakes (the `A`/`I` and `1`/`2`/`3` codes, `cst_id` in the `PUT` body) is not included in the measurement. Other models tokenize differently; the relative comparison is what matters. Methodology and caveats: [docs/token-comparison.md](docs/token-comparison.md).

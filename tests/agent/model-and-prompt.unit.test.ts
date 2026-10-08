@@ -27,11 +27,11 @@ test('createChatModel returns the scripted fake for the fake provider and requir
 
 test('SYSTEM_PROMPT_V1 carries the rules of spec 7.3', () => {
   for (const rule of [
-    /Dados de cliente vêm só das ferramentas/,
-    /Nunca adivinhe um id/,
-    /resolva primeiro com getCustomer/,
-    /Antes de qualquer escrita/,
-    /match "ambiguous", pare/,
-    /Responda em português/,
+    /Customer data comes only from the tools/,
+    /Never guess an id/,
+    /resolve it first with getCustomer/,
+    /Before any write/,
+    /match "ambiguous", stop/,
+    /Reply in English/,
   ]) assert.match(SYSTEM_PROMPT_V1, rule);
 });

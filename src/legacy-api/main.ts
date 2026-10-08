@@ -46,5 +46,5 @@ try {
 } catch (err) {
   if ((err as NodeJS.ErrnoException).code !== 'EADDRINUSE') throw err;
   db.close();
-  fail(`porta ${config.port} em uso em ${config.host}; escolha outra com PORT`);
+  fail(`port ${config.port} in use on ${config.host}; pick another one with PORT`);
 }

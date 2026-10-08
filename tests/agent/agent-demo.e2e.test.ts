@@ -13,10 +13,10 @@ test('[AGT-01] agent:demo shows the real id with memory and the ifUnresolved tex
   const r = await execFileP(process.execPath, [DEMO], { env: { PATH: process.env.PATH!, NODE_OPTIONS: guardNodeOptions() }, timeout: 60_000 });
   const lines = r.stdout.split('\n');
   const at = (line: string) => lines.indexOf(line);
-  const on = at('LLM: fake (roteiro create-then-ask-id) | memória: ligada');
-  const off = at('LLM: fake (roteiro create-then-ask-id) | memória: desligada');
-  const withMemory = at('  < O id de Ana Souza é 31.');
-  const withoutMemory = at('  < Não sei a qual cliente você se refere. Pode me dizer o nome ou o e-mail?');
+  const on = at('LLM: fake (script create-then-ask-id) | memory: on');
+  const off = at('LLM: fake (script create-then-ask-id) | memory: off');
+  const withMemory = at('  < The id of Ana Souza is 31.');
+  const withoutMemory = at('  < I do not know which customer you mean. Can you tell me the name or the email?');
   assert.ok(on !== -1 && off !== -1 && withMemory !== -1 && withoutMemory !== -1, r.stdout);
   // Memory on first, with the real id; then memory off, with the ifUnresolved text.
   assert.ok(on < withMemory && withMemory < off && off < withoutMemory, r.stdout);

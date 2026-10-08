@@ -1,9 +1,9 @@
 {
   "scenario": "four-searches",
-  "description": "Só teste: quatro buscas em sequência e a resposta final, exatamente no teto de chamadas de tool do turno.",
+  "description": "Test only: four searches in a row and the final answer, exactly at the turn's tool call ceiling.",
   "turns": [
     {
-      "match": "busque quatro vezes",
+      "match": "search four times",
       "steps": [
         {
           "toolCalls": [
@@ -38,7 +38,7 @@
           ]
         },
         {
-          "final": "Fiz 4 buscas; a última trouxe {{tool:searchCustomers.total}} clientes."
+          "final": "I ran 4 searches; the last one returned {{tool:searchCustomers.total}} customers."
         }
       ]
     }

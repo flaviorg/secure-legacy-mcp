@@ -13,8 +13,8 @@ import { createChatModel } from './model.ts';
 
 const SCENARIO = 'create-then-ask-id';
 const TURNS = [
-  'crie um cliente chamado Ana Souza, e-mail ana.souza@example.com, telefone 11 98888-7777, segmento smb',
-  'qual é o id dele?',
+  'create a customer named Ana Souza, email ana.souza@example.com, phone 11 98888-7777, segment smb',
+  'what is her id?',
 ];
 
 const out = (line = '') => { process.stdout.write(`${line}\n`); };
@@ -30,8 +30,8 @@ function describeTool(t: ToolTrace): string {
 }
 
 async function runOnce(config: AgentConfig, memory: boolean): Promise<void> {
-  const label = config.provider === 'fake' ? `fake (roteiro ${SCENARIO})` : `openrouter (modelo ${config.model})`;
-  out(`LLM: ${label} | memória: ${memory ? 'ligada' : 'desligada'}`);
+  const label = config.provider === 'fake' ? `fake (script ${SCENARIO})` : `openrouter (model ${config.model})`;
+  out(`LLM: ${label} | memory: ${memory ? 'on' : 'off'}`);
   const api = await startLegacyApi();
   try {
     const token = api.tokens.issue({ name: `agent-demo-${memory ? 'memory' : 'no-memory'}`, role: 'admin' }).token;
@@ -60,9 +60,9 @@ try {
   await runOnce(config, false);
   if (config.provider === 'fake') {
     out();
-    out('O fake segue o roteiro e ignora o prompt de sistema: prova a mecânica (tools, histórico, memória), não a qualidade de um modelo.');
+    out('The fake follows the script and ignores the system prompt: it proves the mechanics (tools, history, memory), not the quality of a model.');
   }
 } catch (err) {
-  process.stderr.write(`agent:demo falhou: ${err instanceof Error ? `${err.name}: ${err.message}` : String(err)}\n`);
+  process.stderr.write(`agent:demo failed: ${err instanceof Error ? `${err.name}: ${err.message}` : String(err)}\n`);
   process.exitCode = 1;
 }

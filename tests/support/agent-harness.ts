@@ -16,7 +16,7 @@ import { guardNodeOptions } from './guard-options.ts';
 export const exampleFixture = (name: string): Fixture => loadFixture(fileURLToPath(new URL(`../../examples/agent/fixtures/${name}.json`, import.meta.url)));
 export const testFixture = (name: string): Fixture => loadFixture(fileURLToPath(new URL(`../agent/fixtures/${name}.json`, import.meta.url)));
 
-export const CREATE_ANA = 'crie um cliente chamado ana souza, e-mail ana.souza@example.com, telefone 11 98888-7777, segmento smb';
+export const CREATE_ANA = 'create a customer named ana souza, email ana.souza@example.com, phone 11 98888-7777, segment smb';
 
 export async function startAgent(t: TestContext, fixture: Fixture, opts: { role?: Role; memory?: boolean; limits?: Partial<AgentLimits>; model?: BaseChatModel } = {}) {
   const api = await startTestApi(t);

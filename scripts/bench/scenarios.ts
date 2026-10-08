@@ -37,25 +37,25 @@ const ENTERPRISE_2024_LEGACY = { sts: 'A', seg: 3, dt_de: '20240101', dt_ate: '2
 export const SCENARIOS: readonly Scenario[] = [
   {
     id: 'C1',
-    title: 'telefone do cliente com e-mail X',
+    title: 'customer phone for email X',
     mirror: [{ tool: 'getV1Customers', args: { eml: TEODORO.cst_eml } }],
     business: [{ tool: 'getCustomer', args: { email: TEODORO.cst_eml } }],
   },
   {
     id: 'C2a',
-    title: 'clientes enterprise ativos cadastrados em 2024 (comparação justa)',
+    title: 'active enterprise customers registered in 2024 (fair comparison)',
     mirror: [{ tool: 'getV1Customers', args: { ...ENTERPRISE_2024_LEGACY, lim: 10 } }],
     business: [{ tool: 'searchCustomers', args: { status: 'active', segment: 'enterprise', createdFrom: '2024-01-01', createdTo: '2024-12-31' } }],
   },
   {
     id: 'C2b',
-    title: 'mesmo pedido, espelho ingênuo sem `lim` (erro do modelo)',
+    title: 'same request, naive mirror without `lim` (model mistake)',
     mirror: [{ tool: 'getV1Customers', args: { ...ENTERPRISE_2024_LEGACY } }],
     business: null,
   },
   {
     id: 'C3',
-    title: 'desative o Teodoro',
+    title: 'deactivate Teodoro',
     mirror: [
       { tool: 'getV1Customers', args: { nm: 'teodoro' } },
       {
