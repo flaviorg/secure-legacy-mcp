@@ -1,0 +1,149 @@
+{
+  "scenario": "failed-turn-memory",
+  "description": "Só teste: um turno que estoura o teto no meio da conversa não fica na memória da thread.",
+  "turns": [
+    {
+      "match": "crie um cliente chamado ana souza, e-mail ana.souza@example.com, telefone 11 98888-7777, segmento smb",
+      "steps": [
+        {
+          "toolCalls": [
+            {
+              "name": "createCustomer",
+              "args": {
+                "name": "Ana Souza",
+                "email": "ana.souza@example.com",
+                "phone": "11 98888-7777",
+                "segment": "smb"
+              }
+            }
+          ]
+        },
+        {
+          "final": "Cliente {{tool:createCustomer.customer.name}} cadastrado com id {{tool:createCustomer.customer.id}}."
+        }
+      ]
+    },
+    {
+      "match": "liste todos os clientes",
+      "steps": [
+        {
+          "toolCalls": [
+            {
+              "name": "searchCustomers",
+              "args": {}
+            }
+          ]
+        },
+        {
+          "toolCalls": [
+            {
+              "name": "searchCustomers",
+              "args": {}
+            }
+          ]
+        },
+        {
+          "toolCalls": [
+            {
+              "name": "searchCustomers",
+              "args": {}
+            }
+          ]
+        },
+        {
+          "toolCalls": [
+            {
+              "name": "searchCustomers",
+              "args": {}
+            }
+          ]
+        },
+        {
+          "toolCalls": [
+            {
+              "name": "searchCustomers",
+              "args": {}
+            }
+          ]
+        },
+        {
+          "toolCalls": [
+            {
+              "name": "searchCustomers",
+              "args": {}
+            }
+          ]
+        },
+        {
+          "toolCalls": [
+            {
+              "name": "searchCustomers",
+              "args": {}
+            }
+          ]
+        },
+        {
+          "toolCalls": [
+            {
+              "name": "searchCustomers",
+              "args": {}
+            }
+          ]
+        },
+        {
+          "toolCalls": [
+            {
+              "name": "searchCustomers",
+              "args": {}
+            }
+          ]
+        },
+        {
+          "toolCalls": [
+            {
+              "name": "searchCustomers",
+              "args": {}
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "match": "desative o cliente teodoro",
+      "steps": [
+        {
+          "toolCalls": [
+            {
+              "name": "getCustomer",
+              "args": {
+                "name": "teodoro"
+              }
+            }
+          ]
+        },
+        {
+          "toolCalls": [
+            {
+              "name": "deactivateCustomer",
+              "args": {
+                "id": "{{tool:getCustomer.customer.id}}"
+              }
+            }
+          ]
+        },
+        {
+          "final": "Cliente {{tool:deactivateCustomer.customer.name}} (id {{tool:deactivateCustomer.customer.id}}) agora está {{tool:deactivateCustomer.customer.status}}."
+        }
+      ]
+    },
+    {
+      "match": "qual é o id dele?",
+      "steps": [
+        {
+          "final": "O id de {{history:createCustomer.customer.name}} é {{history:createCustomer.customer.id}}.",
+          "ifUnresolved": "Não sei a qual cliente você se refere. Pode me dizer o nome ou o e-mail?"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "inputs": [
+    { "type": "promptString", "id": "slm-service-token", "description": "secure-legacy-mcp service token (npm run tokens -- issue ...)", "password": true }
+  ],
+  "servers": {
+    "secure-legacy-mcp": {
+      "type": "stdio",
+      "command": "node",
+      "args": ["${workspaceFolder}/src/mcp/main.ts"],
+      "env": { "SERVICE_TOKEN": "${input:slm-service-token}", "LEGACY_API_URL": "http://127.0.0.1:9999" }
+    }
+  }
+}

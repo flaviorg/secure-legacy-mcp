@@ -1,0 +1,215 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Legacy Customers API",
+    "version": "1.0.0",
+    "description": "Simulated legacy customer registry. Cryptic field names (cst_*), status A/I, segment 1/2/3, dates YYYYMMDD."
+  },
+  "servers": [{ "url": "http://127.0.0.1:9999" }],
+  "security": [{ "bearerAuth": [] }],
+  "paths": {
+    "/v1/health": {
+      "get": {
+        "operationId": "getV1Health",
+        "summary": "Health check",
+        "description": "Public. Returns status UP.",
+        "security": [],
+        "responses": {
+          "200": { "description": "UP", "content": { "application/json": { "schema": { "type": "object", "properties": { "status": { "type": "string", "enum": ["UP"] } }, "required": ["status"] } } } }
+        }
+      }
+    },
+    "/v1/auth/whoami": {
+      "get": {
+        "operationId": "getV1AuthWhoami",
+        "summary": "Current token",
+        "description": "Returns tokenId, name and role (member or admin) of the Bearer token.",
+        "responses": {
+          "200": { "description": "Caller", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Caller" } } } },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "429": { "$ref": "#/components/responses/TooManyRequests" }
+        }
+      }
+    },
+    "/v1/customers": {
+      "get": {
+        "operationId": "getV1Customers",
+        "summary": "List customers",
+        "description": "Filters combine with AND. qtd is the filtered total before lim/off. Without lim returns all rows. Unknown params are ignored. Order: name, cst_id.",
+        "parameters": [
+          { "name": "nm", "in": "query", "description": "Name substring, ignores accents and case", "schema": { "type": "string", "minLength": 1 } },
+          { "name": "eml", "in": "query", "description": "Exact email, ignores case", "schema": { "type": "string", "minLength": 1 } },
+          { "name": "phn", "in": "query", "description": "Exact phone, digits only (DDD + number)", "schema": { "type": "string", "pattern": "^\\d{10,11}$" } },
+          { "name": "sts", "in": "query", "description": "Status: A active, I inactive", "schema": { "type": "string", "enum": ["A", "I"] } },
+          { "name": "seg", "in": "query", "description": "Segment: 1 retail, 2 smb, 3 enterprise", "schema": { "type": "integer", "enum": [1, 2, 3] } },
+          { "name": "dt_de", "in": "query", "description": "Registered on or after (YYYYMMDD)", "schema": { "type": "string", "pattern": "^\\d{8}$" } },
+          { "name": "dt_ate", "in": "query", "description": "Registered on or before (YYYYMMDD)", "schema": { "type": "string", "pattern": "^\\d{8}$" } },
+          { "name": "lim", "in": "query", "description": "Max rows", "schema": { "type": "integer", "minimum": 1, "maximum": 500 } },
+          { "name": "off", "in": "query", "description": "Rows to skip", "schema": { "type": "integer", "minimum": 0 } }
+        ],
+        "responses": {
+          "200": { "description": "Page", "content": { "application/json": { "schema": { "type": "object", "properties": { "qtd": { "type": "integer" }, "dados": { "type": "array", "items": { "$ref": "#/components/schemas/LegacyCustomer" } } }, "required": ["qtd", "dados"] } } } },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "429": { "$ref": "#/components/responses/TooManyRequests" }
+        }
+      },
+      "post": {
+        "operationId": "postV1Customers",
+        "summary": "Create customer",
+        "description": "Admin only. Creates an active customer dated today. Returns only the new id.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "cst_nm": { "type": "string", "minLength": 1, "description": "Name" },
+                  "cst_phn": { "type": "string", "pattern": "^\\d{10,11}$", "description": "Phone, digits only (DDD + number)" },
+                  "cst_eml": { "type": "string", "minLength": 1, "description": "Email, unique ignoring case" },
+                  "cst_seg": { "type": "integer", "enum": [1, 2, 3], "description": "Segment: 1 retail, 2 smb, 3 enterprise" }
+                },
+                "required": ["cst_nm", "cst_phn", "cst_eml", "cst_seg"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Created", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/IdMsg" } } } },
+          "400": { "$ref": "#/components/responses/BadBody" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "409": { "$ref": "#/components/responses/Conflict" },
+          "429": { "$ref": "#/components/responses/TooManyRequests" }
+        }
+      }
+    },
+    "/v1/customers/{id}": {
+      "get": {
+        "operationId": "getV1CustomersById",
+        "summary": "Get customer",
+        "description": "Returns the customer object itself, without the list envelope.",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "description": "cst_id", "schema": { "type": "integer", "minimum": 1 } }
+        ],
+        "responses": {
+          "200": { "description": "Customer", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/LegacyCustomer" } } } },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "429": { "$ref": "#/components/responses/TooManyRequests" }
+        }
+      },
+      "put": {
+        "operationId": "putV1CustomersById",
+        "summary": "Replace customer",
+        "description": "Admin only. Full object required, every field. Do not send cst_id in the body.",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "description": "cst_id", "schema": { "type": "integer", "minimum": 1 } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "cst_nm": { "type": "string", "minLength": 1, "description": "Name" },
+                  "cst_phn": { "type": "string", "pattern": "^\\d{10,11}$", "description": "Phone, digits only (DDD + number)" },
+                  "cst_eml": { "type": "string", "minLength": 1, "description": "Email, unique ignoring case" },
+                  "cst_sts": { "type": "string", "enum": ["A", "I"], "description": "Status: A active, I inactive" },
+                  "cst_seg": { "type": "integer", "enum": [1, 2, 3], "description": "Segment: 1 retail, 2 smb, 3 enterprise" }
+                },
+                "required": ["cst_nm", "cst_phn", "cst_eml", "cst_sts", "cst_seg"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Updated", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/IdMsg" } } } },
+          "400": { "$ref": "#/components/responses/BadBody" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "409": { "$ref": "#/components/responses/Conflict" },
+          "429": { "$ref": "#/components/responses/TooManyRequests" },
+          "500": { "description": "Internal error", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Erro" } } } }
+        }
+      },
+      "delete": {
+        "operationId": "deleteV1CustomersById",
+        "summary": "Delete customer",
+        "description": "Admin only. Physical delete, cannot be undone.",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "description": "cst_id", "schema": { "type": "integer", "minimum": 1 } }
+        ],
+        "responses": {
+          "200": { "description": "Deleted", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/IdMsg" } } } },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "429": { "$ref": "#/components/responses/TooManyRequests" }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": { "type": "http", "scheme": "bearer", "description": "Service token slm_<id>_<segredo>, issued by the token CLI" }
+    },
+    "schemas": {
+      "LegacyCustomer": {
+        "type": "object",
+        "properties": {
+          "cst_id": { "type": "integer" },
+          "cst_nm": { "type": "string" },
+          "cst_phn": { "type": "string", "pattern": "^\\d{10,11}$" },
+          "cst_eml": { "type": "string" },
+          "cst_sts": { "type": "string", "enum": ["A", "I"] },
+          "cst_seg": { "type": "integer", "enum": [1, 2, 3] },
+          "dt_cad": { "type": "string", "pattern": "^\\d{8}$" }
+        },
+        "required": ["cst_id", "cst_nm", "cst_phn", "cst_eml", "cst_sts", "cst_seg", "dt_cad"]
+      },
+      "Caller": {
+        "type": "object",
+        "properties": { "tokenId": { "type": "string" }, "name": { "type": "string" }, "role": { "type": "string", "enum": ["member", "admin"] } },
+        "required": ["tokenId", "name", "role"]
+      },
+      "IdMsg": {
+        "type": "object",
+        "properties": { "id": { "type": "integer" }, "msg": { "type": "string" } },
+        "required": ["id", "msg"]
+      },
+      "Erro": {
+        "type": "object",
+        "properties": { "erro": { "type": "string" } },
+        "required": ["erro"]
+      },
+      "FastifyError": {
+        "type": "object",
+        "properties": { "statusCode": { "type": "integer" }, "code": { "type": "string" }, "error": { "type": "string" }, "message": { "type": "string" } },
+        "required": ["statusCode", "error", "message"]
+      }
+    },
+    "responses": {
+      "BadRequest": { "description": "Invalid query parameter: erro 'parametro invalido: <name>'", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Erro" } } } },
+      "BadBody": { "description": "Body outside the schema, in Fastify's default error format; message names the field", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/FastifyError" } } } },
+      "Unauthorized": { "description": "Missing or invalid token: erro 'nao autorizado'", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Erro" } } } },
+      "Forbidden": {
+        "description": "Role not allowed: erro 'proibido'",
+        "content": { "application/json": { "schema": { "type": "object", "properties": { "erro": { "type": "string" }, "papel_necessario": { "type": "string" } }, "required": ["erro", "papel_necessario"] } } }
+      },
+      "NotFound": {
+        "description": "msg 'nao encontrado'",
+        "content": { "application/json": { "schema": { "type": "object", "properties": { "msg": { "type": "string" } }, "required": ["msg"] } } }
+      },
+      "Conflict": { "description": "erro 'email duplicado'", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Erro" } } } },
+      "TooManyRequests": {
+        "description": "erro 'limite excedido'",
+        "headers": { "retry-after": { "description": "Seconds until the window resets", "schema": { "type": "integer" } } },
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Erro" } } }
+      }
+    }
+  }
+}

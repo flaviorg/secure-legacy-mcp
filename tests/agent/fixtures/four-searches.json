@@ -1,0 +1,46 @@
+{
+  "scenario": "four-searches",
+  "description": "Só teste: quatro buscas em sequência e a resposta final, exatamente no teto de chamadas de tool do turno.",
+  "turns": [
+    {
+      "match": "busque quatro vezes",
+      "steps": [
+        {
+          "toolCalls": [
+            {
+              "name": "searchCustomers",
+              "args": {}
+            }
+          ]
+        },
+        {
+          "toolCalls": [
+            {
+              "name": "searchCustomers",
+              "args": {}
+            }
+          ]
+        },
+        {
+          "toolCalls": [
+            {
+              "name": "searchCustomers",
+              "args": {}
+            }
+          ]
+        },
+        {
+          "toolCalls": [
+            {
+              "name": "searchCustomers",
+              "args": {}
+            }
+          ]
+        },
+        {
+          "final": "Fiz 4 buscas; a última trouxe {{tool:searchCustomers.total}} clientes."
+        }
+      ]
+    }
+  ]
+}

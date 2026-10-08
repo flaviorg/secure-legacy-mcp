@@ -1,0 +1,13 @@
+{
+  "scenario": "ambiguous-maria",
+  "description": "getCustomer devolve ambiguous para um nome com homônimos; o agente pergunta qual cliente e não escreve nada.",
+  "turns": [
+    {
+      "match": "desative a maria silva",
+      "steps": [
+        { "toolCalls": [ { "name": "getCustomer", "args": { "name": "maria silva" } } ] },
+        { "final": "Encontrei mais de um cliente com esse nome: id {{tool:getCustomer.candidates.0.id}} ({{tool:getCustomer.candidates.0.email}}) e id {{tool:getCustomer.candidates.1.id}} ({{tool:getCustomer.candidates.1.email}}). Qual deles devo desativar?" }
+      ]
+    }
+  ]
+}

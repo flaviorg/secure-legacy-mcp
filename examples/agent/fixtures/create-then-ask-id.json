@@ -1,0 +1,22 @@
+{
+  "scenario": "create-then-ask-id",
+  "description": "Turno 1 cadastra um cliente; turno 2 pergunta o id usando só o histórico.",
+  "turns": [
+    {
+      "match": "crie um cliente chamado ana souza, e-mail ana.souza@example.com, telefone 11 98888-7777, segmento smb",
+      "steps": [
+        { "toolCalls": [ { "name": "createCustomer", "args": { "name": "Ana Souza", "email": "ana.souza@example.com", "phone": "11 98888-7777", "segment": "smb" } } ] },
+        { "final": "Cliente {{tool:createCustomer.customer.name}} cadastrado com id {{tool:createCustomer.customer.id}}." }
+      ]
+    },
+    {
+      "match": "qual é o id dele?",
+      "steps": [
+        {
+          "final": "O id de {{history:createCustomer.customer.name}} é {{history:createCustomer.customer.id}}.",
+          "ifUnresolved": "Não sei a qual cliente você se refere. Pode me dizer o nome ou o e-mail?"
+        }
+      ]
+    }
+  ]
+}

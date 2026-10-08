@@ -1,0 +1,91 @@
+{
+  "scenario": "runaway-loop",
+  "description": "Só teste: o modelo pede searchCustomers sem parar, para provar os tetos do agente.",
+  "turns": [
+    {
+      "match": "liste todos os clientes",
+      "steps": [
+        {
+          "toolCalls": [
+            {
+              "name": "searchCustomers",
+              "args": {}
+            }
+          ]
+        },
+        {
+          "toolCalls": [
+            {
+              "name": "searchCustomers",
+              "args": {}
+            }
+          ]
+        },
+        {
+          "toolCalls": [
+            {
+              "name": "searchCustomers",
+              "args": {}
+            }
+          ]
+        },
+        {
+          "toolCalls": [
+            {
+              "name": "searchCustomers",
+              "args": {}
+            }
+          ]
+        },
+        {
+          "toolCalls": [
+            {
+              "name": "searchCustomers",
+              "args": {}
+            }
+          ]
+        },
+        {
+          "toolCalls": [
+            {
+              "name": "searchCustomers",
+              "args": {}
+            }
+          ]
+        },
+        {
+          "toolCalls": [
+            {
+              "name": "searchCustomers",
+              "args": {}
+            }
+          ]
+        },
+        {
+          "toolCalls": [
+            {
+              "name": "searchCustomers",
+              "args": {}
+            }
+          ]
+        },
+        {
+          "toolCalls": [
+            {
+              "name": "searchCustomers",
+              "args": {}
+            }
+          ]
+        },
+        {
+          "toolCalls": [
+            {
+              "name": "searchCustomers",
+              "args": {}
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

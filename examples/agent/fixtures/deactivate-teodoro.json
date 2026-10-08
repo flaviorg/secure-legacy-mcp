@@ -1,0 +1,14 @@
+{
+  "scenario": "deactivate-teodoro",
+  "description": "Resolve o cliente pelo nome com getCustomer e desativa pelo id devolvido, sem passo a passo no pedido.",
+  "turns": [
+    {
+      "match": "desative o cliente teodoro",
+      "steps": [
+        { "toolCalls": [ { "name": "getCustomer", "args": { "name": "teodoro" } } ] },
+        { "toolCalls": [ { "name": "deactivateCustomer", "args": { "id": "{{tool:getCustomer.customer.id}}" } } ] },
+        { "final": "Cliente {{tool:deactivateCustomer.customer.name}} (id {{tool:deactivateCustomer.customer.id}}) agora está {{tool:deactivateCustomer.customer.status}}." }
+      ]
+    }
+  ]
+}

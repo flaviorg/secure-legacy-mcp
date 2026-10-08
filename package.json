@@ -1,0 +1,67 @@
+{
+  "name": "secure-legacy-mcp",
+  "version": "0.1.0",
+  "description": "Secure MCP server that turns a hostile legacy REST API into business actions: service tokens, RBAC, rate limits and a clean stdio channel.",
+  "type": "module",
+  "license": "MIT",
+  "author": "Flavio Gouveia",
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "mcp-server",
+    "legacy-api",
+    "service-tokens",
+    "rbac",
+    "rate-limit",
+    "stdio"
+  ],
+  "engines": {
+    "node": ">=24"
+  },
+  "bin": {
+    "secure-legacy-mcp": "bin/secure-legacy-mcp.js"
+  },
+  "files": [
+    "bin/",
+    "src/mcp/",
+    "src/shared/",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "api": "node --env-file-if-exists=.env src/legacy-api/main.ts",
+    "api:dev": "node --watch --inspect --env-file-if-exists=.env src/legacy-api/main.ts",
+    "tokens": "node --env-file-if-exists=.env src/legacy-api/cli/tokens.ts",
+    "mcp": "node --env-file-if-exists=.env src/mcp/main.ts",
+    "mcp:inspect": "npx -y @modelcontextprotocol/inspector node --env-file-if-exists=.env src/mcp/main.ts",
+    "demo": "node scripts/demo.ts",
+    "agent:demo": "node --env-file-if-exists=.env examples/agent/demo.ts",
+    "bench:tokens": "node scripts/bench/measure-tool-tokens.ts --write",
+    "typecheck": "tsc --noEmit",
+    "test": "node --import ./tests/support/no-network.ts --test \"tests/**/*.test.ts\"",
+    "test:unit": "node --import ./tests/support/no-network.ts --test \"tests/**/*.unit.test.ts\"",
+    "test:int": "node --import ./tests/support/no-network.ts --test \"tests/**/*.int.test.ts\"",
+    "test:e2e": "node --import ./tests/support/no-network.ts --test \"tests/**/*.e2e.test.ts\"",
+    "test:dev": "node --import ./tests/support/no-network.ts --test --watch \"tests/**/*.test.ts\"",
+    "test:coverage": "node --import ./tests/support/no-network.ts --test --experimental-test-coverage --test-coverage-include=\"src/**\" \"tests/**/*.test.ts\"",
+    "test:pack": "node scripts/verify-pack.ts",
+    "test:live": "node --env-file-if-exists=.env --test \"tests/live/**/*.live.ts\"",
+    "hooks:install": "git config core.hooksPath .githooks"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.32.0",
+    "tsx": "4.23.15",
+    "zod": "4.6.5"
+  },
+  "devDependencies": {
+    "@langchain/core": "1.2.14",
+    "@langchain/langgraph": "1.4.19",
+    "@langchain/mcp-adapters": "2.0.0",
+    "@langchain/openai": "1.6.2",
+    "@types/node": "24.19.1",
+    "fastify": "5.12.5",
+    "gpt-tokenizer": "4.0.0",
+    "langchain": "1.5.15",
+    "typescript": "7.0.2"
+  }
+}
