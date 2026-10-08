@@ -58,7 +58,7 @@ test('[BEN-02] docs/token-comparison.md carries the methodology and the same gen
 // Spec 9.1: the caveats go in the README and in docs/token-comparison.md.
 const CAVEATS: [string, RegExp][] = [
   ['other models tokenize differently', /Outros modelos tokenizam diferente/],
-  ['providers reformat the definitions', /provedores (também )?reformatam as definições/],
+  ['providers reformat the definitions', /provedores (também )?reformatam as definições|providers also reformat the tool definitions/],
   ['the cost of mirror mistakes is not measured, except C2b', /não\*{0,2} entra na medição/],
   ['field helpers (D-25), with the cost of the Zod default in ADR 0001', /D-25[^\n]*docs\/adr\/0001|docs\/adr\/0001[^\n]*D-25/],
 ];

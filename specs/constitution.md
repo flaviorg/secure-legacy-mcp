@@ -43,5 +43,5 @@ Princípios que valem para toda feature deste repositório. Um spec ou uma mudan
 
 ## 9. Idioma
 
-- Textos voltados ao modelo (descrições de tools, erros, resources, prompts do servidor) e código em inglês. README e documentação em português, com resumo em inglês no topo do README.
+- Textos voltados ao modelo (descrições de tools, erros, resources, prompts do servidor) e código em inglês. README em inglês; documentação em `docs/` e `specs/` em português.
 - Aulas do curso são citadas só por ID e tema; nenhuma transcrição, slide ou material autoral entra no repositório.

@@ -1,10 +1,8 @@
 # secure-legacy-mcp
 
-> **English summary:** a stdio MCP server that turns a hostile legacy REST API into five business actions, behind a real security layer: hashed, revocable service tokens, server-side RBAC, per-IP and per-token rate limits, errors translated without leaking internals, and a stdout channel kept clean by tests. One command (`npm ci && npm run demo`) runs the whole story with no LLM, no network and no keys.
-
 <p align="center">
-  <strong>Servidor MCP que transforma uma API legada hostil em ações de negócio seguras para agentes de IA.</strong><br/>
-  Tokens de serviço com hash e revogação, RBAC no servidor, rate limit em dois baldes e um canal stdio que nunca vaza.
+  <strong>A stdio MCP server that turns a hostile legacy REST API into five safe business actions for AI agents.</strong><br/>
+  Hashed, revocable service tokens, server-side RBAC, per-IP and per-token rate limits, errors translated without leaking internals, and a stdout channel kept clean by tests. One command (<code>npm ci &amp;&amp; npm run demo</code>) runs the whole story with no LLM, no network and no keys.
 </p>
 
 <p align="center">
@@ -16,61 +14,64 @@
 </p>
 
 <p align="center">
-  <a href="#rode-agora">Início rápido</a> ·
-  <a href="#segurança">Segurança</a> ·
-  <a href="#arquitetura">Arquitetura</a> ·
-  <a href="#custo-em-tokens">Custo em tokens</a> ·
-  <a href="docs/security.md">Modelo de ameaça</a> ·
+  <a href="#run-it-now">Quick start</a> ·
+  <a href="#security">Security</a> ·
+  <a href="#architecture">Architecture</a> ·
+  <a href="#token-cost">Token cost</a> ·
+  <a href="docs/security.md">Threat model</a> ·
   <a href="docs/adr/">ADRs</a>
 </p>
 
-**Sumário**
+> [!NOTE]
+> The project documentation under `docs/` and `specs/` is written in Brazilian Portuguese, and so is some of the real program output quoted below (the demo, the tokens CLI, the agent and the generated token table). That output is kept verbatim.
 
-- [Em 30 segundos](#em-30-segundos): por que este projeto existe e destaques
-- [Rode agora](#rode-agora): início rápido e saída real do demo
-- [Segurança](#segurança): riscos, mitigações e ciclo de vida do token
-- [Ações de negócio, não endpoints](#ações-de-negócio-não-endpoints): tools, resources e prompts
-- [Arquitetura](#arquitetura): diagrama, regras de camada e estrutura de pastas
-- [Custo em tokens](#custo-em-tokens): espelho REST contra ações de negócio
-- [Usar com VS Code, Cursor, Claude Desktop e Inspector](#usar-com-vs-code-cursor-claude-desktop-e-inspector)
-- [Pacote `npx`](#pacote-npx)
-- [Agente LangChain (extra opcional)](#agente-langchain-extra-opcional)
-- [Testes](#testes): suíte, pirâmide, cobertura e CI
-- [Processo](#processo): SDD, TDD, ADRs e hooks
-- [O que mudei em relação à aula](#o-que-mudei-em-relação-à-aula)
-- [Aulas do curso aplicadas](#aulas-do-curso-aplicadas)
-- [Limitações honestas](#limitações-honestas)
-- [Licença](#licença)
+**Contents**
 
-## Em 30 segundos
+- [In 30 seconds](#in-30-seconds): why this project exists and its highlights
+- [Run it now](#run-it-now): quick start and the real demo output
+- [Security](#security): risks, mitigations and the token lifecycle
+- [Business actions, not endpoints](#business-actions-not-endpoints): tools, resources and prompts
+- [Architecture](#architecture): diagram, layer rules and folder structure
+- [Token cost](#token-cost): REST mirror versus business actions
+- [Using it with VS Code, Cursor, Claude Desktop and Inspector](#using-it-with-vs-code-cursor-claude-desktop-and-inspector)
+- [The `npx` package](#the-npx-package)
+- [LangChain agent (optional extra)](#langchain-agent-optional-extra)
+- [Tests](#tests): suite, pyramid, coverage and CI
+- [Process](#process): SDD, TDD, ADRs and hooks
+- [What I changed from the course](#what-i-changed-from-the-course)
+- [Course lessons applied](#course-lessons-applied)
+- [Honest limitations](#honest-limitations)
+- [License](#license)
 
-### Por que este projeto existe
+## In 30 seconds
 
-Agentes de IA precisam falar com os sistemas que a empresa já tem, e esses sistemas quase nunca foram feitos para isso. Uma API legada típica tem campos crípticos (`cst_nm`, `dt_cad`), status `A`/`I`, segmento `1`/`2`/`3`, listagem sem limite e um `PUT` que devolve 500 cru se o corpo trouxer o id. Espelhar cada endpoint numa tool entrega todas essas armadilhas ao modelo; colar a spec OpenAPI no prompt custa contexto e não protege nada.
+### Why this project exists
 
-Os exemplos de MCP costumam parar num token fixo e num filtro em memória. Este projeto vai até onde um time de plataforma precisaria ir antes de ligar um agente num sistema real:
+AI agents need to talk to the systems a company already has, and those systems were almost never built for that. A typical legacy API has cryptic fields (`cst_nm`, `dt_cad`), `A`/`I` statuses, a `1`/`2`/`3` segment, an unbounded listing, and a `PUT` that returns a raw 500 if the body includes the id. Mirroring every endpoint as a tool hands all of those traps to the model; pasting the OpenAPI spec into the prompt costs context and protects nothing.
 
-- **O agente vê ações de negócio**, não endpoints: resolver um cliente por qualquer critério, buscar com filtros no banco, cadastrar, atualizar contato e desativar.
-- **A segurança é de verdade e fica na API**, que continua sendo a autoridade: o servidor MCP é só um cliente HTTP dela e nunca toca o banco.
-- **Tudo é verificável** sem LLM, sem rede e sem chave: um comando roda a história inteira, e 252 testes provam cada critério das specs.
+MCP examples usually stop at a fixed token and an in-memory filter. This project goes as far as a platform team would need to go before wiring an agent into a real system:
 
-### Destaques
+- **The agent sees business actions**, not endpoints: resolve a customer by any criterion, search with database-side filters, register, update contact details and deactivate.
+- **The security is real and lives in the API**, which remains the authority: the MCP server is just an HTTP client of it and never touches the database.
+- **Everything is verifiable** with no LLM, no network and no key: one command runs the whole story, and 252 tests prove every criterion in the specs.
+
+### Highlights
 
 | | |
 |---|---|
-| **Service Tokens** | `slm_<id>_<segredo de 256 bits>`, só o SHA-256 no `node:sqlite`, exibido uma vez, revogação na requisição seguinte, expiração opcional, CLI local |
-| **RBAC no servidor** | Papel `member`/`admin` vem só do registro do token; cabeçalho ou corpo com `role` são ignorados |
-| **Rate limit em dois baldes** | 90/min por token e 180/min por IP, simultâneos; o `_meta` do erro diz qual balde barrou |
-| **Erros traduzidos** | 401/403/429/5xx viram `[CODIGO]` com mensagem acionável para o modelo; stack, SQL e detalhe só no stderr |
-| **stdout limpo** | Teste lê o stdout cru do servidor e exige JSON-RPC 2.0 em toda linha; tokens redigidos nos logs |
-| **Ações de negócio** | 5 tools com `found`/`ambiguous`/`none`, faixas da Matriz de Autonomia e nenhum delete físico |
-| **Custo medido** | Comparativo de tokens gerado por script e conferido pelo `npm test` |
-| **Processo explícito** | SDD com critérios EARS, TDD com `Client` MCP real, 6 ADRs, hook de pre-commit e CI |
-| **Distribuível** | Pacote `npx` com 3 dependências de runtime, validado com `npm pack` e `npx` do tarball |
+| **Service Tokens** | `slm_<id>_<256-bit secret>`, only the SHA-256 stored in `node:sqlite`, shown once, revocation on the next request, optional expiry, local CLI |
+| **Server-side RBAC** | The `member`/`admin` role comes only from the token record; a header or body carrying `role` is ignored |
+| **Two-bucket rate limit** | 90/min per token and 180/min per IP, applied simultaneously; the error `_meta` says which bucket blocked the call |
+| **Translated errors** | 401/403/429/5xx become `[CODE]` with a message the model can act on; stack, SQL and details go to stderr only |
+| **Clean stdout** | A test reads the server's raw stdout and requires JSON-RPC 2.0 on every line; tokens are redacted in logs |
+| **Business actions** | 5 tools with `found`/`ambiguous`/`none`, Autonomy Matrix tiers and no physical delete |
+| **Measured cost** | Token comparison generated by a script and checked by `npm test` |
+| **Explicit process** | SDD with EARS criteria, TDD with a real MCP `Client`, 6 ADRs, a pre-commit hook and CI |
+| **Distributable** | `npx` package with 3 runtime dependencies, validated with `npm pack` and `npx` of the tarball |
 
-## Rode agora
+## Run it now
 
-**Pré-requisito:** Node 24 (veja [`.nvmrc`](.nvmrc)). Sem Docker, sem Ollama, sem chave e sem `.env`.
+**Prerequisite:** Node 24 (see [`.nvmrc`](.nvmrc)). No Docker, no Ollama, no key and no `.env`.
 
 ```bash
 git clone https://github.com/flaviorg/secure-legacy-mcp.git
@@ -78,7 +79,7 @@ cd secure-legacy-mcp
 npm ci && npm run demo
 ```
 
-O demo sobe a API legada no próprio processo (SQLite em memória, seed de 30 clientes, porta efêmera), emite três tokens, inicia um servidor MCP por token como processo filho via stdio e executa 10 passos com um `Client` real do SDK. Trecho da saída real:
+The demo starts the legacy API inside its own process (in-memory SQLite, a seed of 30 customers, an ephemeral port), issues three tokens, starts one MCP server per token as a child process over stdio, and runs 10 steps with a real SDK `Client`. Excerpt of the real output (some of it is in Brazilian Portuguese):
 
 ```
 [2] getCustomer {"name":"teodoro"} (member)
@@ -97,7 +98,7 @@ Concluído em 0,3 s
 ```
 
 <details>
-<summary><strong>Saída completa dos 10 passos</strong></summary>
+<summary><strong>Full output of the 10 steps</strong></summary>
 
 ```
 $ npm run demo
@@ -133,42 +134,42 @@ stdout do MCP: 104 mensagens, todas JSON-RPC 2.0 | stderr: 106 linhas de log JSO
 Concluído em 0,3 s
 ```
 
-A porta e os ids dos tokens mudam a cada execução; ids de clientes, contagens e mensagens vêm do seed e do catálogo de erros. O teste `tests/demo/demo.e2e.test.ts` roda o demo e confere os 10 passos.
+The port and the token ids change on every run; customer ids, counts and messages come from the seed and the error catalog. The test `tests/demo/demo.e2e.test.ts` runs the demo and checks the 10 steps.
 
 </details>
 
 > [!NOTE]
-> O `npm ci` avisa `npm warn install-scripts` para `esbuild` e `fsevents`. É esperado: o projeto não aprova scripts de instalação e o `tsx` funciona sem eles ([ADR 0006](docs/adr/0006-tsx-runtime-in-package.md)).
+> `npm ci` prints `npm warn install-scripts` for `esbuild` and `fsevents`. This is expected: the project does not approve install scripts and `tsx` works without them ([ADR 0006](docs/adr/0006-tsx-runtime-in-package.md)).
 
-## Segurança
+## Security
 
-A API legada é a autoridade de autenticação, papel e limite; o servidor MCP é cliente HTTP dela e nunca toca o banco. Cada requisição passa por quatro portões, nesta ordem: balde por IP, autenticação Bearer, balde por token e RBAC.
+The legacy API is the authority for authentication, role and rate limit; the MCP server is an HTTP client of it and never touches the database. Every request goes through four gates, in this order: IP bucket, Bearer authentication, token bucket and RBAC.
 
-| Risco | Mitigação | Teste |
+| Risk | Mitigation | Test |
 |---|---|---|
-| Vazamento do banco expõe tokens | Só SHA-256 no banco; token exibido uma vez | `token-store.unit` |
-| Token vazado no cliente | Revogação imediata pela CLI, expiração opcional, prefixo `slm_` para varredura | `tokens-cli.e2e` |
-| Força bruta e escalada de papel | Segredo de 256 bits, balde por IP antes da autenticação, 401 genérico; papel só do registro do token | `auth-rbac.int`, `rate-limit.int` |
-| Contorno do limite com vários tokens | Balde por IP somado ao balde por token | `rate-limit.int` |
-| Erro bruto ou token chegando ao modelo ou ao log | Catálogo de erros `[CODIGO]`, detalhe só em stderr, redação por campo e por padrão | `tool-errors.e2e`, `define-tool.unit`, `stdout-clean.e2e` |
-| Protocolo stdio corrompido | Logger em stderr, `console.*` redirecionado, stdout lido cru no teste | `stdout-clean.e2e` |
-| Agente age sobre o cliente errado | `ambiguous` sem escolha, `destructiveHint` nas escritas, sem delete físico | `tools-read.e2e`, `agent-memory.e2e` |
-| Prompt injection por dado de cliente | Dados marcados como não confiáveis em `instructions` e `service-info`; `member` não escreve | Ilustrado no passo 10 do demo; não testável sem modelo real |
+| A database leak exposes tokens | Only SHA-256 in the database; token shown once | `token-store.unit` |
+| Token leaked on the client | Immediate revocation through the CLI, optional expiry, `slm_` prefix for scanning | `tokens-cli.e2e` |
+| Brute force and role escalation | 256-bit secret, IP bucket before authentication, generic 401; role only from the token record | `auth-rbac.int`, `rate-limit.int` |
+| Rate limit bypass with several tokens | IP bucket added on top of the token bucket | `rate-limit.int` |
+| Raw error or token reaching the model or the log | `[CODE]` error catalog, details only on stderr, redaction by field and by pattern | `tool-errors.e2e`, `define-tool.unit`, `stdout-clean.e2e` |
+| Corrupted stdio protocol | Logger on stderr, `console.*` redirected, stdout read raw in the test | `stdout-clean.e2e` |
+| Agent acts on the wrong customer | `ambiguous` without picking one, `destructiveHint` on writes, no physical delete | `tools-read.e2e`, `agent-memory.e2e` |
+| Prompt injection through customer data | Data flagged as untrusted in `instructions` and `service-info`; `member` cannot write | Illustrated in demo step 10; not testable without a real model |
 
-Modelo de ameaça completo, com SQL injection, entrada gigante, pacote, segredos versionados e o que não é coberto: [`docs/security.md`](docs/security.md).
+Full threat model, covering SQL injection, oversized input, the package, committed secrets and what is not covered: [`docs/security.md`](docs/security.md).
 
-### Ciclo de vida do token
+### Token lifecycle
 
-Emissão, listagem e revogação só pela CLI local, com acesso ao arquivo do banco. Não existe rota de emissão.
+Issuing, listing and revoking happen only through the local CLI, with access to the database file. There is no issuing route.
 
 ```bash
-npm run tokens -- issue --name vscode-flavio --role member --expires-in 30d   # exibe o token uma única vez
-npm run tokens -- list                                                         # id, nome, papel, último uso, expiração, status
-npm run tokens -- revoke <id>                                                  # vale na próxima requisição
+npm run tokens -- issue --name vscode-flavio --role member --expires-in 30d   # shows the token exactly once
+npm run tokens -- list                                                         # id, name, role, last use, expiry, status
+npm run tokens -- revoke <id>                                                  # takes effect on the next request
 ```
 
 <details>
-<summary><strong>Saída real da CLI</strong> (contra um <code>DATABASE_PATH</code> temporário; o segredo foi trocado por <code>&lt;43 caracteres&gt;</code>)</summary>
+<summary><strong>Real CLI output</strong> (against a temporary <code>DATABASE_PATH</code>; the secret was replaced by <code>&lt;43 caracteres&gt;</code>; the output is in Brazilian Portuguese)</summary>
 
 ```
 $ npm run tokens -- issue --name vscode-flavio --role member --expires-in 30d
@@ -189,118 +190,118 @@ i7qm4n67  ci-admin       admin   2026-10-04  -           nunca       revogado
 
 </details>
 
-A revogação vale na requisição seguinte, sem reiniciar a API: a verificação consulta o banco a cada chamada, sem cache.
+Revocation takes effect on the next request, without restarting the API: the check queries the database on every call, with no cache.
 
-### Balde de IP compartilhado
+### Shared IP bucket
 
-VS Code, Cursor, Claude Desktop, Inspector e o agente rodando juntos saem todos de `127.0.0.1` e dividem o limite de 180 requisições por minuto, mesmo com tokens diferentes. Quando uma tool devolve `[RATE_LIMITED]`, o `_meta` diz qual balde barrou (`scope: token` ou `scope: ip`).
+VS Code, Cursor, Claude Desktop, Inspector and the agent running together all come from `127.0.0.1` and share the limit of 180 requests per minute, even with different tokens. When a tool returns `[RATE_LIMITED]`, the `_meta` says which bucket blocked the call (`scope: token` or `scope: ip`).
 
-## Ações de negócio, não endpoints
+## Business actions, not endpoints
 
 ### Tools
 
-| Tool | Papel | Faixa da Matriz de Autonomia | O que faz |
+| Tool | Role | Autonomy Matrix tier | What it does |
 |---|---|---|---|
-| `getCustomer` | member, admin | 1: leitura (`readOnlyHint`) | Resolve por id, e-mail, telefone ou nome. Devolve `found`, `ambiguous` (até 5 candidatos, nunca escolhe um homônimo) ou `none` |
-| `searchCustomers` | member, admin | 1: leitura | Filtros no SQL (nome, status, segmento, datas), página de 1 a 50 e cursor opaco amarrado aos filtros |
-| `createCustomer` | admin | 2: aditiva | Cadastra e devolve o objeto completo (o legado só devolve o id); e-mail em minúsculas, telefone em E.164. Se a releitura falhar depois do cadastro, `[READBACK_FAILED]` com o id e sem convite a repetir |
-| `updateCustomerContact` | admin | 3: destrutiva, idempotente | Lê, compara e só escreve se algo muda (`changed: []` sem `PUT`); manda o objeto completo sem o id |
-| `deactivateCustomer` | admin | 3: destrutiva, idempotente | Desativa (nunca apaga); já inativo devolve `alreadyInactive: true` sem `PUT` |
+| `getCustomer` | member, admin | 1: read (`readOnlyHint`) | Resolves by id, email, phone or name. Returns `found`, `ambiguous` (up to 5 candidates, never picks a namesake) or `none` |
+| `searchCustomers` | member, admin | 1: read | SQL-side filters (name, status, segment, dates), a page of 1 to 50 and an opaque cursor bound to the filters |
+| `createCustomer` | admin | 2: additive | Registers and returns the full object (the legacy API returns only the id); email in lowercase, phone in E.164. If the read-back fails after the registration, `[READBACK_FAILED]` with the id and no invitation to retry |
+| `updateCustomerContact` | admin | 3: destructive, idempotent | Reads, compares and writes only if something changes (`changed: []` with no `PUT`); sends the full object without the id |
+| `deactivateCustomer` | admin | 3: destructive, idempotent | Deactivates (never deletes); an already inactive customer returns `alreadyInactive: true` with no `PUT` |
 
-A faixa 4 (delete físico, reativação, emissão de token, troca de papel) não existe como tool, por construção. Com token `member`, as escritas devolvem `[FORBIDDEN]`: a API é a autoridade.
+Tier 4 (physical delete, reactivation, token issuing, role change) does not exist as a tool, by construction. With a `member` token, the writes return `[FORBIDDEN]`: the API is the authority.
 
-### Resources e prompts
+### Resources and prompts
 
-| Tipo | Nome | O que entrega |
+| Type | Name | What it delivers |
 |---|---|---|
-| Resource | `customers://service-info` | Versão, host da API, papel do token atual via `whoami`, limites, glossário e o que não é suportado |
-| Resource template | `customers://customers/{id}` | Um cliente por id, em JSON |
-| Prompt | `find-customer` | Roteiro para localizar um cliente |
-| Prompt | `onboard-customer` | Roteiro para cadastrar um cliente |
-| Prompt | `deactivate-customer` | Roteiro de desativação, com confirmação explícita antes de escrever |
+| Resource | `customers://service-info` | Version, API host, the current token's role via `whoami`, limits, glossary and what is not supported |
+| Resource template | `customers://customers/{id}` | One customer by id, as JSON |
+| Prompt | `find-customer` | Script for locating a customer |
+| Prompt | `onboard-customer` | Script for registering a customer |
+| Prompt | `deactivate-customer` | Deactivation script, with explicit confirmation before writing |
 
-## Arquitetura
+## Architecture
 
 ```mermaid
 flowchart LR
-  subgraph Clientes MCP
+  subgraph MCP clients
     VS[VS Code / Cursor / Claude Desktop]
     INS[MCP Inspector]
-    AG[Agente LangChain.js<br/>examples/agent]
-    T[Testes: Client + StdioClientTransport]
+    AG[LangChain.js agent<br/>examples/agent]
+    T[Tests: Client + StdioClientTransport]
   end
-  subgraph MCP["secure-legacy-mcp (processo stdio)"]
+  subgraph MCP["secure-legacy-mcp (stdio process)"]
     TL[tools / resources / prompts]
     AP[application: CustomerService]
     IN[infrastructure: LegacyCustomerGateway]
-    DM[domain: schemas Zod, erros, porta]
+    DM[domain: Zod schemas, errors, port]
     TL --> AP --> DM
-    IN -.implementa porta.-> DM
+    IN -.implements port.-> DM
     AP --> IN
   end
-  subgraph API["API legada (Fastify, :9999)"]
-    RL1[onRequest: balde por IP]
+  subgraph API["Legacy API (Fastify, :9999)"]
+    RL1[onRequest: IP bucket]
     AU[onRequest: allowlist + Bearer]
-    RL2[onRequest: balde por token]
+    RL2[onRequest: token bucket]
     RB[preValidation: RBAC]
-    RT[rotas /v1/...]
+    RT[/v1 routes/...]
     RL1 --> AU --> RL2 --> RB --> RT
   end
   DB[(node:sqlite<br/>customers, service_tokens)]
-  CLI[CLI de tokens]
-  VS & INS & AG & T -- JSON-RPC em stdin/stdout --> TL
+  CLI[Tokens CLI]
+  VS & INS & AG & T -- JSON-RPC over stdin/stdout --> TL
   IN -- HTTP + Bearer slm_... + x-request-id --> RL1
   RT --> DB
   AU --> DB
   CLI --> DB
 ```
 
-Regras de camada, verificadas por teste (`tests/repo/conventions.unit.test.ts`):
+Layer rules, verified by a test (`tests/repo/conventions.unit.test.ts`):
 
-1. `src/mcp` nunca importa `src/legacy-api` (o pacote publicado não contém a API).
-2. `tools`, `resources` e `prompts` só chamam o service; o service só conhece a porta `CustomerGateway`.
-3. Só a `infrastructure` faz HTTP: monta URL e cabeçalhos, timeout de 5 s por tentativa, uma repetição só em leitura, mapa de status para o catálogo de erros.
-4. `src/shared` (logger, redação, relógio, padrão de token) não importa os outros dois.
-5. Em `src/` e `examples/`, só os entrypoints e `examples/agent/config.ts` leem `process.env`.
+1. `src/mcp` never imports `src/legacy-api` (the published package does not contain the API).
+2. `tools`, `resources` and `prompts` only call the service; the service only knows the `CustomerGateway` port.
+3. Only `infrastructure` does HTTP: it builds the URL and headers, applies a 5 s timeout per attempt, retries once and only on reads, and maps status codes to the error catalog.
+4. `src/shared` (logger, redaction, clock, token pattern) does not import the other two.
+5. In `src/` and `examples/`, only the entrypoints and `examples/agent/config.ts` read `process.env`.
 
-### Estrutura de pastas
+### Folder structure
 
 <details>
-<summary><strong>Mapa do repositório</strong></summary>
+<summary><strong>Repository map</strong></summary>
 
 ```
 secure-legacy-mcp/
-├── bin/secure-legacy-mcp.js     # binário do pacote npx (roda TypeScript com tsx)
+├── bin/secure-legacy-mcp.js     # npx package binary (runs TypeScript with tsx)
 ├── src/
-│   ├── legacy-api/              # API legada simulada: Fastify + node:sqlite (fora do pacote)
-│   │   ├── auth/                #   tokens com SHA-256 e RBAC
-│   │   ├── rate-limit/          #   baldes por IP e por token
-│   │   ├── routes/              #   rotas /v1/... com as armadilhas do legado
-│   │   ├── db/                  #   schema críptico e seed de 30 clientes
-│   │   └── cli/tokens.ts        #   CLI issue / list / revoke
-│   ├── mcp/                     # servidor MCP em camadas
-│   │   ├── domain/              #   schemas Zod, catálogo de erros, porta CustomerGateway
-│   │   ├── infrastructure/      #   gateway HTTP e de-para do legado (único lugar com HTTP)
-│   │   ├── application/         #   CustomerService e cursor
-│   │   ├── tools/               #   as 5 ações de negócio
-│   │   ├── resources/           #   service-info e customers/{id}
-│   │   └── prompts/             #   find, onboard e deactivate
-│   └── shared/                  # logger em stderr, redação, relógio, padrão de token
-├── examples/agent/              # agente LangChain.js com memória (extra opcional)
-├── scripts/                     # demo, verificação do pacote e comparativo de tokens
-├── tests/                       # por área (legacy-api, mcp, agent, bench, repo...); sufixos unit, int, e2e e live
-├── specs/                       # constituição e 4 specs SDD com critérios EARS
-├── docs/                        # segurança, ADRs, clientes, contrato da API, incidentes
-├── .vscode/mcp.json             # config do VS Code com input de senha
-├── .githooks/pre-commit         # typecheck + testes
-└── AGENTS.md                    # instruções para agentes de código
+│   ├── legacy-api/              # simulated legacy API: Fastify + node:sqlite (outside the package)
+│   │   ├── auth/                #   SHA-256 tokens and RBAC
+│   │   ├── rate-limit/          #   per-IP and per-token buckets
+│   │   ├── routes/              #   /v1/... routes with the legacy traps
+│   │   ├── db/                  #   cryptic schema and a seed of 30 customers
+│   │   └── cli/tokens.ts        #   issue / list / revoke CLI
+│   ├── mcp/                     # layered MCP server
+│   │   ├── domain/              #   Zod schemas, error catalog, CustomerGateway port
+│   │   ├── infrastructure/      #   HTTP gateway and legacy mapping (the only place with HTTP)
+│   │   ├── application/         #   CustomerService and cursor
+│   │   ├── tools/               #   the 5 business actions
+│   │   ├── resources/           #   service-info and customers/{id}
+│   │   └── prompts/             #   find, onboard and deactivate
+│   └── shared/                  # stderr logger, redaction, clock, token pattern
+├── examples/agent/              # LangChain.js agent with memory (optional extra)
+├── scripts/                     # demo, package verification and token comparison
+├── tests/                       # by area (legacy-api, mcp, agent, bench, repo...); suffixes unit, int, e2e and live
+├── specs/                       # constitution and 4 SDD specs with EARS criteria
+├── docs/                        # security, ADRs, clients, API contract, incidents
+├── .vscode/mcp.json             # VS Code config with a password input
+├── .githooks/pre-commit         # typecheck + tests
+└── AGENTS.md                    # instructions for coding agents
 ```
 
 </details>
 
-## Custo em tokens
+## Token cost
 
-Gerado por `npm run bench:tokens` e conferido pelo `npm test` (o teste falha se este bloco divergir da saída do medidor). O espelho REST é gerado mecanicamente de [`docs/legacy-api/openapi.json`](docs/legacy-api/openapi.json) por uma função pura. O JSON Schema das ações de negócio usa os helpers de campo `emailField` e `isoDateField` (D-25): com o padrão do Zod 4 (`z.email()` e `z.iso.date()`), as definições custariam 1327 tokens em vez de 956 ([ADR 0001](docs/adr/0001-business-actions-not-endpoint-mirror.md)).
+Generated by `npm run bench:tokens` and checked by `npm test` (the test fails if this block diverges from the meter's output). The REST mirror is generated mechanically from [`docs/legacy-api/openapi.json`](docs/legacy-api/openapi.json) by a pure function. The JSON Schema of the business actions uses the field helpers `emailField` and `isoDateField` (D-25): with the Zod 4 defaults (`z.email()` and `z.iso.date()`), the definitions would cost 1327 tokens instead of 956 ([ADR 0001](docs/adr/0001-business-actions-not-endpoint-mirror.md)). The generated block below is in Brazilian Portuguese.
 
 <!-- token-table:start -->
 Tokenizador: `o200k_base` (gpt-tokenizer) | estimativa: caracteres/4
@@ -331,24 +332,24 @@ As definições das ações de negócio custam 11% mais tokens que as do espelho
 C2a é a comparação justa: os dois lados limitados a 10 itens. C2b mostra um erro possível do modelo, não um baseline: sem `lim`, a API legada devolve tudo o que casa com o filtro. O custo dos outros erros do espelho (códigos `A`/`I` e `1`/`2`/`3`, `cst_id` no corpo do `PUT`) não entra na medição. Outros modelos tokenizam diferente; vale a comparação relativa. Metodologia e ressalvas: [docs/token-comparison.md](docs/token-comparison.md).
 <!-- token-table:end -->
 
-## Usar com VS Code, Cursor, Claude Desktop e Inspector
+## Using it with VS Code, Cursor, Claude Desktop and Inspector
 
-Todos os clientes seguem os mesmos passos: subir a API, emitir um token e deixar o cliente iniciar o servidor com o token em `SERVICE_TOKEN`.
+All clients follow the same steps: start the API, issue a token, and let the client start the server with the token in `SERVICE_TOKEN`.
 
 ```bash
-npm run api                                              # API em http://127.0.0.1:9999, banco em ./data/legacy.db
-npm run tokens -- issue --name vscode --role member      # copie o token: ele não aparece de novo
+npm run api                                              # API at http://127.0.0.1:9999, database at ./data/legacy.db
+npm run tokens -- issue --name vscode --role member      # copy the token: it is not shown again
 ```
 
-| Cliente | Como conectar |
+| Client | How to connect |
 |---|---|
-| **VS Code** | A config versionada [`.vscode/mcp.json`](.vscode/mcp.json) inicia o servidor e pede o token por um input de senha (o token não fica no arquivo). Inicie `secure-legacy-mcp`, cole o token e abra um chat **novo**: um chat aberto antes de o servidor subir não enxerga as tools |
-| **Cursor** | Trecho pronto em [`docs/clients/README.md`](docs/clients/README.md#cursor), com caminho absoluto e placeholder `slm_<id>_<segredo>`. O arquivo guarda o token em claro, por isso não é versionado |
-| **Claude Desktop** | Trecho pronto em [`docs/clients/README.md`](docs/clients/README.md#claude-desktop). Com nvm, `node` e `npx` podem não estar no `PATH` do app: use o caminho absoluto do `node` |
-| **Inspector** | `npm run mcp:inspect` (baixa o `@modelcontextprotocol/inspector` na primeira vez; exige Node 22.19 ou mais novo) |
+| **VS Code** | The versioned config [`.vscode/mcp.json`](.vscode/mcp.json) starts the server and asks for the token through a password input (the token is not stored in the file). Start `secure-legacy-mcp`, paste the token and open a **new** chat: a chat opened before the server started does not see the tools |
+| **Cursor** | Ready-made snippet in [`docs/clients/README.md`](docs/clients/README.md#cursor), with an absolute path and the placeholder `slm_<id>_<segredo>`. The file stores the token in plain text, so it is not versioned |
+| **Claude Desktop** | Ready-made snippet in [`docs/clients/README.md`](docs/clients/README.md#claude-desktop). With nvm, `node` and `npx` may not be in the app's `PATH`: use the absolute path to `node` |
+| **Inspector** | `npm run mcp:inspect` (downloads `@modelcontextprotocol/inspector` the first time; requires Node 22.19 or newer) |
 
 <details>
-<summary><strong>Exemplo de config para Cursor e Claude Desktop</strong></summary>
+<summary><strong>Example config for Cursor and Claude Desktop</strong></summary>
 
 ```json
 {
@@ -365,18 +366,18 @@ npm run tokens -- issue --name vscode --role member      # copie o token: ele n�
 }
 ```
 
-Caminhos dos arquivos, armadilha do `PATH` com nvm e a variante por `npx`: [`docs/clients/README.md`](docs/clients/README.md).
+File locations, the nvm `PATH` trap and the `npx` variant: [`docs/clients/README.md`](docs/clients/README.md).
 
 </details>
 
 > [!WARNING]
-> **Nunca use `npm run mcp` como comando de um cliente:** o npm escreve o próprio banner (`> secure-legacy-mcp@0.1.0 mcp`) no stdout, antes do JSON-RPC. Os clientes iniciam `node src/mcp/main.ts` (ou `npx -y secure-legacy-mcp`, depois de publicado); à mão, `npm run -s mcp` não imprime o banner.
+> **Never use `npm run mcp` as a client command:** npm writes its own banner (`> secure-legacy-mcp@0.1.0 mcp`) to stdout, before the JSON-RPC. Clients start `node src/mcp/main.ts` (or `npx -y secure-legacy-mcp`, once published); by hand, `npm run -s mcp` does not print the banner.
 
-Sem `.env`, os scripts com `--env-file-if-exists=.env` escrevem `.env not found. Continuing without it.` no stderr. É do Node, não do servidor, e não afeta o stdout.
+Without a `.env`, the scripts that use `--env-file-if-exists=.env` write `.env not found. Continuing without it.` to stderr. That comes from Node, not from the server, and does not affect stdout.
 
-## Pacote `npx`
+## The `npx` package
 
-O pacote publica só `bin/`, `src/mcp/`, `src/shared/`, `package.json`, `README.md` e `LICENSE`, com três dependências de runtime (`@modelcontextprotocol/sdk`, `zod` e `tsx`, que roda o TypeScript dentro de `node_modules`). A validação gera o tarball, executa o binário com `npx --package <tgz>` e lista as tools com um `Client` real, no Node 24. Saída real:
+The package publishes only `bin/`, `src/mcp/`, `src/shared/`, `package.json`, `README.md` and `LICENSE`, with three runtime dependencies (`@modelcontextprotocol/sdk`, `zod` and `tsx`, which runs the TypeScript inside `node_modules`). The validation generates the tarball, runs the binary with `npx --package <tgz>` and lists the tools with a real `Client`, on Node 24. Real output (in Brazilian Portuguese):
 
 ```
 $ npm run test:pack
@@ -386,19 +387,19 @@ npx --package secure-legacy-mcp-0.1.0.tgz secure-legacy-mcp -> tools/list: 5 too
 ok [PKG-02]
 ```
 
-**Ainda não publicado no npm.** Antes de publicar: preencher `repository`, `homepage` e `bugs` no `package.json`, trocar os links relativos deste README por URLs absolutas do repositório (a página do npm não tem `docs/`, `specs/` nem `examples/`), conferir se o nome `secure-legacy-mcp` continua livre no npm (senão, usar um escopo) e rodar `npm publish`. A partir daí, clientes podem iniciar o servidor com `npx -y secure-legacy-mcp`.
+**Not yet published to npm.** Before publishing: fill in `repository`, `homepage` and `bugs` in `package.json`, replace this README's relative links with absolute repository URLs (the npm page has no `docs/`, `specs/` or `examples/`), check that the name `secure-legacy-mcp` is still free on npm (otherwise, use a scope) and run `npm publish`. From then on, clients can start the server with `npx -y secure-legacy-mcp`.
 
-## Agente LangChain (extra opcional)
+## LangChain agent (optional extra)
 
-Um agente LangChain.js consome este servidor pelo `@langchain/mcp-adapters` e corrige o agente sem memória da aula 203493 ("qual é o id dele?"), com `MemorySaver` e `thread_id`. Por padrão usa um modelo fake roteirizado; com `OPENROUTER_API_KEY`, um modelo real.
+A LangChain.js agent consumes this server through `@langchain/mcp-adapters` and fixes the memoryless agent from lesson 203493 ("what is his id?"), with `MemorySaver` and `thread_id`. By default it uses a scripted fake model; with `OPENROUTER_API_KEY`, a real model.
 
 ```bash
-npm run agent:demo     # modelo fake, sem chave
-npm run test:live      # modelo real; pula sem OPENROUTER_API_KEY
+npm run agent:demo     # fake model, no key
+npm run test:live      # real model; skipped without OPENROUTER_API_KEY
 ```
 
 <details>
-<summary><strong>Saída real com o modelo fake</strong> (memória ligada e desligada)</summary>
+<summary><strong>Real output with the fake model</strong> (memory on and off; the output is in Brazilian Portuguese)</summary>
 
 ```
 $ npm run agent:demo
@@ -421,93 +422,93 @@ O fake segue o roteiro e ignora o prompt de sistema: prova a mecânica (tools, h
 
 </details>
 
-O fake escolhe a resposta pela mensagem do usuário e tira o id e o nome do resultado real de `createCustomer`, devolvido pelo servidor MCP real contra a API real. Ele **não** prova que um modelo obedece ao prompt de sistema; isso só aparece com modelo real (`npm run test:live`, que assevera o banco e o id, nunca o texto). O agente para o turno em 4 chamadas de tool ou 6 de modelo (os dois tetos têm teste), e um turno que falha não fica na memória da conversa. Detalhes em [`examples/agent/README.md`](examples/agent/README.md).
+The fake picks the answer from the user's message and takes the id and the name from the real result of `createCustomer`, returned by the real MCP server against the real API. It does **not** prove that a model obeys the system prompt; that only shows up with a real model (`npm run test:live`, which asserts the database and the id, never the text). The agent stops a turn at 4 tool calls or 6 model calls (both ceilings have a test), and a turn that fails is not kept in the conversation memory. Details in [`examples/agent/README.md`](examples/agent/README.md).
 
-## Testes
+## Tests
 
 ```bash
-npm test               # 252 testes: 136 unit, 50 int, 66 e2e; cerca de 3,7 s neste Mac
-npm run test:coverage  # mesma suíte, com relatório de cobertura de src/**
-npm run typecheck      # tsc --noEmit com TypeScript 7
-npm run test:pack      # pacote (fora do npm test)
-npm run test:live      # agente com modelo real (fora do npm test; pula sem chave)
+npm test               # 252 tests: 136 unit, 50 int, 66 e2e; about 3.7 s on this Mac
+npm run test:coverage  # same suite, with a coverage report for src/**
+npm run typecheck      # tsc --noEmit with TypeScript 7
+npm run test:pack      # package (outside npm test)
+npm run test:live      # agent with a real model (outside npm test; skipped without a key)
 ```
 
-| Qualidade | Como é garantida |
+| Quality | How it is ensured |
 |---|---|
-| **Pirâmide** | `unit` testa funções puras e fakes (schemas, mapper, gateway com `fetch` falso, service com gateway em memória, cursor, limitador, router do fake); `int` roda a API em processo com `app.inject`, o comparativo de tokens e o gateway contra servidores HTTP locais (redirecionamento nunca seguido); `e2e` sobe o servidor MCP como processo filho e conversa com ele por um `Client` real, contra uma API real com falhas injetadas pelo harness (500, payload inválido), inclusive pela entrada do `.vscode/mcp.json` |
-| **Autossuficiência** | Cada teste cria a própria API `:memory:`, os próprios tokens e o próprio servidor MCP |
-| **Sem rede** | `tests/support/no-network.ts`, carregado por `--import` no processo de teste e nos filhos, bloqueia qualquer conexão fora de loopback com `NO_NETWORK` |
-| **Critérios EARS** | Todo critério dos `specs/` tem um teste com o ID no nome, conferido por `tests/repo/conventions.unit.test.ts` |
-| **Documentação viva** | A tabela de tokens deste README, as seções e os testes citados em `docs/security.md` são conferidos pelo `npm test` |
-| **CI** | [`.github/workflows/ci.yml`](.github/workflows/ci.yml): typecheck, testes com relatório de cobertura e `test:pack` no Node do `.nvmrc`; o agente com modelo real só sob demanda |
+| **Pyramid** | `unit` tests pure functions and fakes (schemas, mapper, gateway with a fake `fetch`, service with an in-memory gateway, cursor, limiter, the fake's router); `int` runs the API in-process with `app.inject`, the token comparison and the gateway against local HTTP servers (redirects are never followed); `e2e` starts the MCP server as a child process and talks to it through a real `Client`, against a real API with failures injected by the harness (500, invalid payload), including through the `.vscode/mcp.json` entry |
+| **Self-sufficiency** | Each test creates its own `:memory:` API, its own tokens and its own MCP server |
+| **No network** | `tests/support/no-network.ts`, loaded with `--import` in the test process and in the children, blocks any connection outside loopback with `NO_NETWORK` |
+| **EARS criteria** | Every criterion in `specs/` has a test with the ID in its name, checked by `tests/repo/conventions.unit.test.ts` |
+| **Living documentation** | The token table in this README, the sections, and the tests cited in `docs/security.md` are checked by `npm test` |
+| **CI** | [`.github/workflows/ci.yml`](.github/workflows/ci.yml): typecheck, tests with a coverage report and `test:pack` on the `.nvmrc` Node; the agent with a real model only on demand |
 
-**Cobertura:** 99,01% de linhas, 92,38% de ramos e 96,69% de funções em `src/**` na última execução (varia alguns centésimos entre execuções), sem portão mínimo. O Node repassa a coleta de cobertura (`NODE_V8_COVERAGE`) aos processos filhos mesmo com `env` explícito, então o servidor MCP, a API (`src/legacy-api/main.ts`) e a CLI rodando nos testes e2e entram na conta. As linhas não cobertas são caminhos de falha do processo (exceção não tratada, falha ao subir a API) e ramos defensivos.
+**Coverage:** 99.01% of lines, 92.38% of branches and 96.69% of functions in `src/**` on the last run (it varies by a few hundredths between runs), with no minimum gate. Node forwards coverage collection (`NODE_V8_COVERAGE`) to child processes even with an explicit `env`, so the MCP server, the API (`src/legacy-api/main.ts`) and the CLI running in the e2e tests are counted. The uncovered lines are process failure paths (unhandled exception, failure to start the API) and defensive branches.
 
-## Processo
+## Process
 
-- **SDD:** [`specs/constitution.md`](specs/constitution.md) e quatro specs com contexto, critérios EARS, non-goals, dúvidas resolvidas (conferências feitas nos pacotes instalados) e checklist de testes: [`001-legacy-api-and-security`](specs/001-legacy-api-and-security/spec.md), [`002-mcp-business-actions`](specs/002-mcp-business-actions/spec.md), [`003-packaging-clients-and-bench`](specs/003-packaging-clients-and-bench/spec.md), [`004-langchain-agent-memory`](specs/004-langchain-agent-memory/spec.md).
-- **TDD:** cada teste foi escrito e visto falhando antes da implementação, num processo registrado no diário de construção do autor (fora deste repositório). Aqui dá para conferir o resultado: todo critério EARS tem um teste com o ID no nome.
-- **[`AGENTS.md`](AGENTS.md):** instruções curtas para agentes de código (comandos, camadas, regras).
-- **Hook de pre-commit:** `npm run hooks:install` aponta o Git para [`.githooks/pre-commit`](.githooks/pre-commit), que roda typecheck e testes.
-- **ADRs:** [`docs/adr/`](docs/adr/): ações de negócio (com o custo de schema), só stdio, tokens com SHA-256, limitador próprio, erros sem `structuredContent`, `tsx` no pacote.
-- **Incidentes:** falhas reais da construção em [`docs/incidents/`](docs/incidents/README.md).
-- **Contrato da API legada:** [`docs/legacy-api/`](docs/legacy-api/README.md), com o `openapi.json` checado contra as rotas.
+- **SDD:** [`specs/constitution.md`](specs/constitution.md) and four specs with context, EARS criteria, non-goals, resolved doubts (checks made against the installed packages) and a test checklist: [`001-legacy-api-and-security`](specs/001-legacy-api-and-security/spec.md), [`002-mcp-business-actions`](specs/002-mcp-business-actions/spec.md), [`003-packaging-clients-and-bench`](specs/003-packaging-clients-and-bench/spec.md), [`004-langchain-agent-memory`](specs/004-langchain-agent-memory/spec.md).
+- **TDD:** every test was written and seen failing before the implementation, in a process recorded in the author's build journal (outside this repository). Here you can check the outcome: every EARS criterion has a test with the ID in its name.
+- **[`AGENTS.md`](AGENTS.md):** short instructions for coding agents (commands, layers, rules).
+- **Pre-commit hook:** `npm run hooks:install` points Git at [`.githooks/pre-commit`](.githooks/pre-commit), which runs typecheck and tests.
+- **ADRs:** [`docs/adr/`](docs/adr/): business actions (with the schema cost), stdio only, SHA-256 tokens, a custom limiter, errors without `structuredContent`, `tsx` in the package.
+- **Incidents:** real failures from the build in [`docs/incidents/`](docs/incidents/README.md).
+- **Legacy API contract:** [`docs/legacy-api/`](docs/legacy-api/README.md), with the `openapi.json` checked against the routes.
 
-## O que mudei em relação à aula
+## What I changed from the course
 
-O ponto de partida foi o código do módulo de MCP do curso. As mudanças principais: SQLite com schema legado no lugar do MongoDB em Docker, tokens com hash e revogação no lugar de um `Map`, dois baldes de rate limit, ações de negócio no lugar de CRUD 1:1 e um agente com memória.
+The starting point was the code from the course's MCP module. The main changes: SQLite with a legacy schema instead of MongoDB in Docker, hashed and revocable tokens instead of a `Map`, two rate-limit buckets, business actions instead of 1:1 CRUD, and an agent with memory.
 
 <details>
-<summary><strong>Tabela completa: na aula, neste projeto e por quê</strong></summary>
+<summary><strong>Full table: in the lesson, in this project, and why</strong></summary>
 
-| Na aula | Neste projeto | Por quê |
+| In the lesson | In this project | Why |
 |---|---|---|
-| MongoDB em Docker (203482) | `node:sqlite` em processo, com schema legado de nomes crípticos | Ambiente sem Docker; o schema críptico torna real o de-para da `infrastructure` |
-| Filtro em memória no `getCustomer` (203484) | Filtros e paginação na consulta SQL; o MCP nunca lista tudo | Escala; a aula registrou que exigiria mudar a API |
-| Tokens num `Map`, UUID (203488) | SHA-256 em SQLite, `slm_<id>_<segredo de 256 bits>`, revogação imediata, expiração opcional, CLI | A aula listou os dois como riscos |
-| Emissão por rota pública com segredo fixo (203488) | Só pela CLI local | Menor superfície de ataque |
-| Rate limit por token com fallback de IP (203489, 203490) | Dois baldes simultâneos (token 90/min, IP 180/min) | Fecha o contorno por vários tokens |
-| `isError` dentro de `structuredContent` (203490) | Erro em `content` com prefixo `[CODIGO]` e `_meta`, sem `structuredContent` | No SDK 1.32 o cliente valida `structuredContent` contra o `outputSchema` mesmo com `isError` |
-| Zod v3 (`zod/v3`) | Zod 4 (`zod`) | O SDK 1.32 aceita o Zod 4; uma versão só no projeto |
-| CRUD 1:1 em tools | 5 ações de negócio, desativação no lugar de delete | Menor privilégio e Matriz de Autonomia |
-| `getCustomer` devolve cliente ou nada | `match: found \| ambiguous \| none` com até 5 candidatos | Impede o agente de agir sobre o homônimo errado |
-| JSON formatado no texto (203483) | JSON compacto | Custo em tokens, alertado na própria aula |
-| Verdaccio em Docker (203491) | `npm pack` + `npx` do tarball | Sem Docker e sem publicar |
-| Agente sem memória (203493) | `MemorySaver` + `thread_id`, teste antes e depois | O exemplo é efêmero e de dois turnos; o checkpointer em memória basta |
-| Personagem de TV como cliente de demo (203485) | Nome fictício próprio (Teodoro Escarlate) | Evita marca registrada num repositório público |
-| Testes de MCP sem LLM fake | Modelo fake roteirizado no exemplo de agente | `npm test` sem rede |
-| `--experimental-strip-types` (203479) | Node 24 nativo; `tsc --noEmit` com TypeScript 7 | Versão atual do runtime |
-| Sem SDD, EARS nem hooks no módulo de MCP | `specs/`, EARS, `.githooks/pre-commit` | Processo do módulo de agentes aplicado aqui |
+| MongoDB in Docker (203482) | In-process `node:sqlite`, with a legacy schema of cryptic names | Environment without Docker; the cryptic schema makes the `infrastructure` mapping real |
+| In-memory filter in `getCustomer` (203484) | Filters and pagination in the SQL query; the MCP never lists everything | Scale; the lesson noted this would require changing the API |
+| Tokens in a `Map`, UUID (203488) | SHA-256 in SQLite, `slm_<id>_<256-bit secret>`, immediate revocation, optional expiry, CLI | The lesson listed both as risks |
+| Issuing through a public route with a fixed secret (203488) | Only through the local CLI | Smaller attack surface |
+| Per-token rate limit with IP fallback (203489, 203490) | Two simultaneous buckets (token 90/min, IP 180/min) | Closes the bypass with several tokens |
+| `isError` inside `structuredContent` (203490) | Error in `content` with a `[CODE]` prefix and `_meta`, no `structuredContent` | In SDK 1.32 the client validates `structuredContent` against the `outputSchema` even with `isError` |
+| Zod v3 (`zod/v3`) | Zod 4 (`zod`) | SDK 1.32 accepts Zod 4; a single version in the project |
+| 1:1 CRUD as tools | 5 business actions, deactivation instead of delete | Least privilege and the Autonomy Matrix |
+| `getCustomer` returns a customer or nothing | `match: found \| ambiguous \| none` with up to 5 candidates | Stops the agent from acting on the wrong namesake |
+| Pretty-printed JSON in the text (203483) | Compact JSON | Token cost, flagged in the lesson itself |
+| Verdaccio in Docker (203491) | `npm pack` + `npx` of the tarball | No Docker and no publishing |
+| Agent without memory (203493) | `MemorySaver` + `thread_id`, test before and after | The example is ephemeral and two turns long; the in-memory checkpointer is enough |
+| TV character as the demo customer (203485) | Own fictional name (Teodoro Escarlate) | Avoids a trademark in a public repository |
+| MCP tests without a fake LLM | Scripted fake model in the agent example | `npm test` without network |
+| `--experimental-strip-types` (203479) | Native Node 24; `tsc --noEmit` with TypeScript 7 | Current runtime version |
+| No SDD, EARS or hooks in the MCP module | `specs/`, EARS, `.githooks/pre-commit` | Process from the agents module applied here |
 
 </details>
 
-## Aulas do curso aplicadas
+## Course lessons applied
 
-Citadas só por ID e tema; nenhuma transcrição, slide ou material das aulas está neste repositório.
+Cited only by ID and topic; no transcript, slide or lesson material is in this repository.
 
 <details>
-<summary><strong>Aulas por módulo</strong></summary>
+<summary><strong>Lessons by module</strong></summary>
 
-- **Módulo de MCP na prática:** 203470 (ações de negócio contra a spec inteira no prompt; leitura sobre boas práticas de segurança), 203473 (servidores oficiais e cuidado com `npx` de terceiros), 203477 (instruções de projeto curtas), 203479 (primeiro servidor, TDD com cliente real, Inspector), 203480 (resources, prompts e resource templates), 203482 a 203485 (camadas, injeção de dependência, busca e atualização sobre uma API REST), 203486 e 203487 (hooks de autenticação e papel), 203488 (Service Tokens), 203489 e 203490 (rate limit e tradução de 401/403/429), 203491 (pacote com `bin` e `tsx`), 203492 (transportes), 203493 (agente LangChain com MCP).
-- **Módulo de agentes:** 221504 a 221506 (SDD, EARS, non-goals e hooks), 221511 (tetos explícitos de agente), 221513 (avaliar pelo estado, não pelo texto), 221515 e 221516 (`node:sqlite`), 221517 (timeout, repetição e saída de ferramenta como observação), 221518 (disciplina do stdio e configs de editor), 221519 (memória por conversa), 221522 (estimativa de caracteres por token), 221525 (logs e Matriz de Autonomia).
-- **Outros módulos:** 198027 (levar o código da aula para um projeto próprio), 198068 e 198069 (medição de tokens), 198070 (código de IA como PR não auditado), 198071 (instruções curtas para agentes), 198072 (Inspector), 200954 (config que falha cedo e versões fixadas), 200963 (validar o que vem de fora), 200964 a 200968 (checkpointer com `thread_id`), 213487 a 213489 (portfólio com incidentes reais).
+- **MCP in practice module:** 203470 (business actions versus the whole spec in the prompt; reading on security best practices), 203473 (official servers and caution with third-party `npx`), 203477 (short project instructions), 203479 (first server, TDD with a real client, Inspector), 203480 (resources, prompts and resource templates), 203482 to 203485 (layers, dependency injection, search and update over a REST API), 203486 and 203487 (authentication and role hooks), 203488 (Service Tokens), 203489 and 203490 (rate limit and translating 401/403/429), 203491 (package with `bin` and `tsx`), 203492 (transports), 203493 (LangChain agent with MCP).
+- **Agents module:** 221504 to 221506 (SDD, EARS, non-goals and hooks), 221511 (explicit agent ceilings), 221513 (evaluate by state, not by text), 221515 and 221516 (`node:sqlite`), 221517 (timeout, retry and tool output as an observation), 221518 (stdio discipline and editor configs), 221519 (per-conversation memory), 221522 (characters-per-token estimate), 221525 (logs and the Autonomy Matrix).
+- **Other modules:** 198027 (taking lesson code into your own project), 198068 and 198069 (token measurement), 198070 (AI code as an unaudited PR), 198071 (short instructions for agents), 198072 (Inspector), 200954 (config that fails early and pinned versions), 200963 (validating what comes from outside), 200964 to 200968 (checkpointer with `thread_id`), 213487 to 213489 (portfolio with real incidents).
 
 </details>
 
-## Limitações honestas
+## Honest limitations
 
-- **O fake prova mecânica, não inteligência.** O agente com modelo fake mostra fluxo, contratos, tetos e memória; não diz nada sobre como um modelo real se comporta.
-- **Limitador em memória, em janela fixa.** Zera no reinício, não serve para várias instâncias e, na virada da janela, deixa passar até o dobro do limite em sequência.
-- **API simulada.** As armadilhas do legado são deliberadas e o seed tem 30 clientes; com só 3 clientes casando com o filtro do comparativo, a linha C2b custa aqui quase o mesmo que a C2a.
-- **Tokenizador de referência.** `o200k_base` é um tokenizador entre muitos; os provedores também reformatam as definições de tools. Vale a comparação relativa.
-- **Validado só em Node 24.** O binário provavelmente roda em Node 22.18 ou mais novo, mas isso não é testado.
-- **Defesa contra prompt injection.** O cliente de seed com nome de instrução ilustra que o servidor devolve o texto como dado; não é um teste de defesa.
-- **Dado legado devolvido como está.** A API legada aceita qualquer nome e e-mail não vazios. As regras de formato (nome de 2 a 120 caracteres depois de aparar as pontas, sem caractere de controle ou de formatação bidirecional; e-mail com `@`) valem só na entrada das tools; um cliente gravado com nome de 1 caractere ou e-mail sem `@` aparece nas leituras como está, e `[UPSTREAM_CONTRACT]` fica para respostas fora do contrato legado.
-- **Escrita sem controle de concorrência.** `updateCustomerContact` e `deactivateCustomer` leem o cliente e mandam o objeto inteiro no `PUT`, como o legado exige; a API não tem ETag nem `If-Match`. Uma mudança feita por outro cliente entre a leitura e o `PUT` é sobrescrita com os valores lidos.
-- **Só stdio, só loopback.** Sem transporte HTTP remoto (ADR 0002) e sem TLS: a API escuta em `127.0.0.1`. O que fica de fora está em [`docs/security.md`](docs/security.md#o-que-não-é-coberto).
-- **Verificação no VS Code pendente.** A config `.vscode/mcp.json` é validada por teste, mas a conexão de ponta a ponta num VS Code real ainda não foi conferida (roteiro no [spec 003](specs/003-packaging-clients-and-bench/spec.md)).
+- **The fake proves mechanics, not intelligence.** The agent with the fake model shows flow, contracts, ceilings and memory; it says nothing about how a real model behaves.
+- **In-memory limiter, fixed window.** It resets on restart, does not work across several instances and, at a window rollover, lets up to double the limit through in sequence.
+- **Simulated API.** The legacy traps are deliberate and the seed has 30 customers; with only 3 customers matching the comparison's filter, row C2b costs here almost the same as C2a.
+- **Reference tokenizer.** `o200k_base` is one tokenizer among many; providers also reformat the tool definitions. The relative comparison is what matters.
+- **Validated on Node 24 only.** The binary probably runs on Node 22.18 or newer, but that is not tested.
+- **Defense against prompt injection.** The seed customer with an instruction-like name illustrates that the server returns the text as data; it is not a defense test.
+- **Legacy data returned as is.** The legacy API accepts any non-empty name and email. The format rules (name of 2 to 120 characters after trimming, with no control or bidirectional formatting character; email with `@`) apply only at the tools' input; a customer stored with a 1-character name or an email without `@` shows up in reads as is, and `[UPSTREAM_CONTRACT]` is reserved for responses outside the legacy contract.
+- **Writes without concurrency control.** `updateCustomerContact` and `deactivateCustomer` read the customer and send the whole object in the `PUT`, as the legacy API requires; the API has no ETag or `If-Match`. A change made by another client between the read and the `PUT` is overwritten with the values that were read.
+- **Stdio only, loopback only.** No remote HTTP transport (ADR 0002) and no TLS: the API listens on `127.0.0.1`. What is left out is in [`docs/security.md`](docs/security.md#o-que-não-é-coberto).
+- **VS Code verification pending.** The `.vscode/mcp.json` config is validated by a test, but the end-to-end connection in a real VS Code has not been checked yet (script in [spec 003](specs/003-packaging-clients-and-bench/spec.md)).
 
-## Licença
+## License
 
 [MIT](LICENSE) © 2026 Flavio Gouveia

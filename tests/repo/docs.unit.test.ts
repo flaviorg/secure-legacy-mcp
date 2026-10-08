@@ -6,28 +6,28 @@ import { listRepoFiles, PROJECT_ROOT, readRepoFile } from '../support/repo-files
 
 const files = listRepoFiles();
 
-// Spec 10.1: the title with the English summary, then 15 sections in this order.
+// Spec 10.1: the title with the tagline, then 15 sections in this order.
 const README_SECTIONS = [
-  'Em 30 segundos',
-  'Rode agora',
-  'Segurança',
-  'Ações de negócio, não endpoints',
-  'Arquitetura',
-  'Custo em tokens',
-  'Usar com VS Code, Cursor, Claude Desktop e Inspector',
-  'Pacote `npx`',
-  'Agente LangChain (extra opcional)',
-  'Testes',
-  'Processo',
-  'O que mudei em relação à aula',
-  'Aulas do curso aplicadas',
-  'Limitações honestas',
-  'Licença',
+  'In 30 seconds',
+  'Run it now',
+  'Security',
+  'Business actions, not endpoints',
+  'Architecture',
+  'Token cost',
+  'Using it with VS Code, Cursor, Claude Desktop and Inspector',
+  'The `npx` package',
+  'LangChain agent (optional extra)',
+  'Tests',
+  'Process',
+  'What I changed from the course',
+  'Course lessons applied',
+  'Honest limitations',
+  'License',
 ];
 
 test('the README has the 16 sections of spec 10.1, in order', () => {
   const readme = readRepoFile('README.md');
-  assert.match(readme, /^# secure-legacy-mcp\n\n> \*\*English summary:\*\*/);
+  assert.match(readme, /^# secure-legacy-mcp\n\n<p align=\"center\">\n  <strong>A stdio MCP server/);
   const sections = [...readme.matchAll(/^## (.+)$/gm)].map((m) => m[1]);
   assert.deepEqual(sections, README_SECTIONS);
 });
